@@ -55,7 +55,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:8081",
-        "exp://localhost:8081"
+        "exp://localhost:8081",
+        "https://*.vercel.app",
+        "*"  # Para desarrollo - restringir en producción
     ]
     
     # ═══════════════════════════════════════════════════════════════════════

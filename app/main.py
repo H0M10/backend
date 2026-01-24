@@ -33,7 +33,9 @@ logger.add(
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 )
 
-if not settings.DEBUG:
+# Solo agregar logs a archivo en entornos NO serverless (Vercel no soporta filesystem)
+import os
+if not settings.DEBUG and not os.environ.get("VERCEL"):
     logger.add(
         "logs/app.log",
         rotation="10 MB",
@@ -107,7 +109,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],  # Permitir todos los orígenes para Vercel
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

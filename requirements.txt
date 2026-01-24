@@ -3,6 +3,7 @@
 # Framework principal
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
+mangum>=0.17.0  # Adaptador para serverless (Vercel/AWS Lambda)
 
 # Base de datos
 sqlalchemy>=2.0.25

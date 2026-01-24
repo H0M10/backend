@@ -1,0 +1,55 @@
+# Vercel Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# Tests
+tests/
+test_*.py
+pytest.ini
+conftest.py
+
+# Development
+.env
+.env.local
+*.log
+logs/
+
+# Docker (no necesario en Vercel)
+Dockerfile
+docker-compose.yml
+
+# Database migrations locales
+alembic/
+alembic.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Archivos de desarrollo
+analyze_db.py
+check_users.py
+fix_passwords.py
+gen_hashes.py
+simple_api.py
+start_server.py
+test_api.py
+test_iot.py
+api_log.txt
+
+# Database SQL
+database/

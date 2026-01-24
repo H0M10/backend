@@ -1,0 +1,95 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# NOVAGUARDIAN - Docker Compose
+# ═══════════════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Base de datos PostgreSQL
+  # ═══════════════════════════════════════════════════════════════════════════
+  db:
+    image: postgres:15-alpine
+    container_name: novaguardian-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-novaguardian}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-novaguardian123}
+      POSTGRES_DB: ${DB_NAME:-novaguardian}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-novaguardian}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Backend API
+  # ═══════════════════════════════════════════════════════════════════════════
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: novaguardian-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-novaguardian}:${DB_PASSWORD:-novaguardian123}@db:5432/${DB_NAME:-novaguardian}
+      SECRET_KEY: ${SECRET_KEY:-your-super-secret-key-change-in-production}
+      DEBUG: ${DEBUG:-false}
+      PORT: 8000
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Redis (para caché y WebSockets)
+  # ═══════════════════════════════════════════════════════════════════════════
+  redis:
+    image: redis:7-alpine
+    container_name: novaguardian-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PgAdmin (opcional, para desarrollo)
+  # ═══════════════════════════════════════════════════════════════════════════
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: novaguardian-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@novaguardian.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      - db
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: novaguardian-network

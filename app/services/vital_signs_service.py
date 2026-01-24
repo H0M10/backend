@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.models.vital_signs import VitalSigns
-from app.schemas.vital_signs import VitalSignCreate
+from app.schemas.vital_signs import VitalSignsCreate
 
 
 class VitalSignsService:
@@ -18,7 +18,7 @@ class VitalSignsService:
     @staticmethod
     async def create(
         db: AsyncSession, 
-        vital_data: VitalSignCreate
+        vital_data: VitalSignsCreate
     ) -> VitalSigns:
         """Crear registro de signos vitales"""
         vital = VitalSigns(**vital_data.model_dump())

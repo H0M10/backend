@@ -2,8 +2,21 @@
 # NOVAGUARDIAN - Entry point para Vercel Serverless
 # ═══════════════════════════════════════════════════════════════════════════
 
-from mangum import Mangum
-from app.main import app
+from http.server import BaseHTTPRequestHandler
+import json
 
-# Mangum es el adaptador que convierte ASGI (FastAPI) a formato serverless
-handler = Mangum(app, lifespan="off")
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        
+        response = {
+            "name": "NovaGuardian",
+            "version": "1.0.0",
+            "status": "online",
+            "message": "Bienvenido a NovaGuardian API 🏥"
+        }
+        
+        self.wfile.write(json.dumps(response).encode())
+        return

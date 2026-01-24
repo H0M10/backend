@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # ═══════════════════════════════════════════════════════════════════════
     # JWT
     # ═══════════════════════════════════════════════════════════════════════
-    JWT_SECRET_KEY: str = "fdfe80cc059ad21596f9062cc2213505a754ff61bd01feee9b848ee61ee26b20"
+    JWT_SECRET_KEY: str = "tu_clave_secreta_muy_segura_cambiar_en_produccion"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -55,9 +55,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:8081",
-        "exp://localhost:8081",
-        "https://*.vercel.app",
-        "*"  # Para desarrollo - restringir en producción
+        "exp://localhost:8081"
     ]
     
     # ═══════════════════════════════════════════════════════════════════════

@@ -40,5 +40,5 @@ EXPOSE ${PORT:-8000}
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health')" || exit 1
 
-# Comando de inicio - usa variable PORT de Railway o 8000 por defecto
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Comando de inicio - usa simple_api.py que funciona con Supabase
+CMD uvicorn simple_api:app --host 0.0.0.0 --port ${PORT:-8000}

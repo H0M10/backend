@@ -1196,6 +1196,73 @@ async def get_monitored_persons(
     persons = await _get_monitored_persons(current_user['id'], db)
     return {"success": True, "data": persons}
 
+@app.post("/api/v1/monitored-persons")
+async def create_monitored_person_alt(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Crear nueva persona monitoreada (endpoint alternativo)"""
+    data = await request.json()
+    
+    # Aceptar tanto snake_case como camelCase
+    first_name = data.get('first_name') or data.get('firstName')
+    last_name = data.get('last_name') or data.get('lastName')
+    
+    if not first_name or not last_name:
+        raise HTTPException(status_code=400, detail="first_name y last_name son requeridos")
+    
+    person_id = uuid4()
+    now = get_utc_now()
+    
+    # Convertir birth_date de string a date
+    birth_date = None
+    birth_date_str = data.get('birth_date') or data.get('birthDate')
+    if birth_date_str:
+        if isinstance(birth_date_str, str):
+            try:
+                birth_date = datetime.strptime(birth_date_str.split('T')[0], '%Y-%m-%d').date()
+            except ValueError:
+                birth_date = None
+    
+    # Obtener otros campos
+    relationship = data.get('relationship')
+    gender = data.get('gender')
+    blood_type = data.get('blood_type') or data.get('bloodType')
+    photo_url = data.get('photo_url') or data.get('photoUrl')
+    notes = data.get('notes')
+    
+    # Convertir weight y height
+    weight = None
+    weight_val = data.get('weight')
+    if weight_val:
+        try:
+            weight = float(weight_val)
+        except (ValueError, TypeError):
+            pass
+    
+    height = None
+    height_val = data.get('height')
+    if height_val:
+        try:
+            height = float(height_val)
+        except (ValueError, TypeError):
+            pass
+    
+    await db.execute("""
+        INSERT INTO monitored_persons (
+            id, user_id, first_name, last_name, relationship, birth_date,
+            gender, blood_type, weight, height, photo_url, notes, is_active, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, TRUE, $13, $13)
+    """, 
+        person_id, current_user['id'], first_name, last_name,
+        relationship, birth_date, gender, blood_type,
+        weight, height, photo_url, notes, now
+    )
+    
+    person = await _get_monitored_person(str(person_id), current_user['id'], db)
+    return {"success": True, "data": person}
+
 @app.get("/api/v1/monitored-persons/{person_id}")
 async def get_monitored_person(
     person_id: str,

@@ -89,3 +89,13 @@ class User(Base, UUIDMixin, TimestampMixin):
     def full_name(self) -> str:
         """Nombre completo del usuario"""
         return f"{self.first_name} {self.last_name}"
+    
+    @property
+    def hashed_password(self) -> str:
+        """Alias para password_hash (compatibilidad con auth_service)"""
+        return self.password_hash
+    
+    @hashed_password.setter
+    def hashed_password(self, value: str):
+        """Setter para hashed_password"""
+        self.password_hash = value

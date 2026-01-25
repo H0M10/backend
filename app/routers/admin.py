@@ -240,7 +240,7 @@ async def get_admin_devices(
                 {
                     "id": str(device.id),
                     "code": device.code,
-                    "model": device.model.value if device.model else None,
+                    "model": device.model,
                     "name": device.name,
                     "is_active": device.is_active,
                     "battery_level": device.battery_level,
@@ -286,7 +286,7 @@ async def get_admin_device(
         return {
             "id": str(device.id),
             "code": device.code,
-            "model": device.model.value if device.model else None,
+            "model": device.model,
             "name": device.name,
             "is_active": device.is_active,
             "battery_level": device.battery_level,
@@ -329,8 +329,8 @@ async def get_pending_alerts(
             "items": [
                 {
                     "id": str(alert.id),
-                    "alert_type": str(alert.alert_type.value) if alert.alert_type else None,
-                    "severity": str(alert.severity.value) if alert.severity else None,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
                     "title": alert.title,
                     "message": alert.message,
                     "is_read": alert.is_read,
@@ -401,8 +401,8 @@ async def get_admin_alerts(
             "items": [
                 {
                     "id": str(alert.id),
-                    "alert_type": str(alert.alert_type.value) if alert.alert_type else None,
-                    "severity": str(alert.severity.value) if alert.severity else None,
+                    "alert_type": alert.alert_type,
+                    "severity": alert.severity,
                     "title": alert.title,
                     "message": alert.message,
                     "is_read": alert.is_read,
@@ -445,8 +445,8 @@ async def get_admin_alert(
         
         return {
             "id": str(alert.id),
-            "alert_type": str(alert.alert_type.value) if alert.alert_type else None,
-            "severity": str(alert.severity.value) if alert.severity else None,
+            "alert_type": alert.alert_type,
+            "severity": alert.severity,
             "title": alert.title,
             "message": alert.message,
             "is_read": alert.is_read,
@@ -511,8 +511,8 @@ async def get_admin_monitored(
                     "first_name": person.first_name,
                     "last_name": person.last_name,
                     "birth_date": person.birth_date.isoformat() if person.birth_date else None,
-                    "gender": person.gender.value if person.gender else None,
-                    "blood_type": person.blood_type.value if person.blood_type else None,
+                    "gender": person.gender,
+                    "blood_type": person.blood_type,
                     "user_id": str(person.user_id) if person.user_id else None,
                     "is_active": person.is_active,
                     "created_at": person.created_at.isoformat() if person.created_at else None
@@ -555,8 +555,8 @@ async def get_admin_monitored_person(
             "first_name": person.first_name,
             "last_name": person.last_name,
             "birth_date": person.birth_date.isoformat() if person.birth_date else None,
-            "gender": person.gender.value if person.gender else None,
-            "blood_type": person.blood_type.value if person.blood_type else None,
+            "gender": person.gender,
+            "blood_type": person.blood_type,
             "user_id": str(person.user_id) if person.user_id else None,
             "is_active": person.is_active,
             "created_at": person.created_at.isoformat() if person.created_at else None

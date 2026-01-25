@@ -2,28 +2,18 @@
 # NOVAGUARDIAN - Modelo de Dispositivo IoT
 # ═══════════════════════════════════════════════════════════════════════════
 
-from sqlalchemy import Column, String, Boolean, DateTime, Float, Text, ForeignKey, Enum
+from sqlalchemy import Column, String, Boolean, DateTime, Float, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, UUIDMixin
-import enum
 
 
-class DeviceStatus(str, enum.Enum):
-    """Estados posibles del dispositivo"""
-    CONNECTED = "connected"
-    DISCONNECTED = "disconnected"
-    LOW_BATTERY = "low_battery"
-    ERROR = "error"
-    CHARGING = "charging"
+# Valores válidos para status (enum nativo en PostgreSQL)
+DEVICE_STATUS_VALUES = ["connected", "disconnected", "low_battery", "error", "charging"]
 
-
-class DeviceModel(str, enum.Enum):
-    """Modelos de dispositivo disponibles"""
-    NOVA_BAND_V1 = "NovaBand V1"
-    NOVA_BAND_V2 = "NovaBand V2"
-    NOVA_BAND_PRO = "NovaBand Pro"
+# Valores válidos para model (enum nativo en PostgreSQL)
+DEVICE_MODEL_VALUES = ["NovaBand V1", "NovaBand V2", "NovaBand Pro"]
 
 
 class Device(Base, UUIDMixin, TimestampMixin):
@@ -43,7 +33,8 @@ class Device(Base, UUIDMixin, TimestampMixin):
     # INFORMACIÓN DEL DISPOSITIVO
     # ═══════════════════════════════════════════════════════════════════════
     name = Column(String(100), nullable=True)  # Nombre personalizado
-    model = Column(Enum(DeviceModel), default=DeviceModel.NOVA_BAND_V1, nullable=False)
+    # Usamos String para que coincida con el enum nativo de PostgreSQL
+    model = Column(String(20), default="NovaBand V1", nullable=False)
     firmware_version = Column(String(20), default="1.0.0", nullable=False)
     hardware_version = Column(String(20), default="1.0", nullable=False)
     
@@ -60,7 +51,8 @@ class Device(Base, UUIDMixin, TimestampMixin):
     # ═══════════════════════════════════════════════════════════════════════
     # ESTADO DEL DISPOSITIVO
     # ═══════════════════════════════════════════════════════════════════════
-    status = Column(Enum(DeviceStatus), default=DeviceStatus.DISCONNECTED, nullable=False)
+    # Usamos String para coincidir con el enum nativo de PostgreSQL
+    status = Column(String(20), default="disconnected", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Batería (0-100)

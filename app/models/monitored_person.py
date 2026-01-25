@@ -2,31 +2,18 @@
 # NOVAGUARDIAN - Modelo de Persona Monitoreada
 # ═══════════════════════════════════════════════════════════════════════════
 
-from sqlalchemy import Column, String, Boolean, Date, Float, Text, ForeignKey, Enum
+from sqlalchemy import Column, String, Boolean, Date, Float, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, UUIDMixin
-import enum
 
 
-class Gender(str, enum.Enum):
-    """Género de la persona monitoreada"""
-    MALE = "male"
-    FEMALE = "female"
-    OTHER = "other"
+# Valores válidos para gender (enum nativo en PostgreSQL)
+GENDER_VALUES = ["male", "female", "other"]
 
-
-class BloodType(str, enum.Enum):
-    """Tipos de sangre"""
-    A_POSITIVE = "A+"
-    A_NEGATIVE = "A-"
-    B_POSITIVE = "B+"
-    B_NEGATIVE = "B-"
-    AB_POSITIVE = "AB+"
-    AB_NEGATIVE = "AB-"
-    O_POSITIVE = "O+"
-    O_NEGATIVE = "O-"
+# Valores válidos para blood_type (enum nativo en PostgreSQL)
+BLOOD_TYPE_VALUES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
 
 
 class MonitoredPerson(Base, UUIDMixin, TimestampMixin):
@@ -51,13 +38,15 @@ class MonitoredPerson(Base, UUIDMixin, TimestampMixin):
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
     birth_date = Column(Date, nullable=True)
-    gender = Column(Enum(Gender), nullable=True)
+    # Usamos String para coincidir con enum nativo de PostgreSQL
+    gender = Column(String(10), nullable=True)
     photo_url = Column(Text, nullable=True)
     
     # ═══════════════════════════════════════════════════════════════════════
     # INFORMACIÓN MÉDICA BÁSICA
     # ═══════════════════════════════════════════════════════════════════════
-    blood_type = Column(Enum(BloodType), nullable=True)
+    # Usamos String para coincidir con enum nativo de PostgreSQL
+    blood_type = Column(String(5), nullable=True)
     weight = Column(Float, nullable=True)  # kg
     height = Column(Float, nullable=True)  # cm
     

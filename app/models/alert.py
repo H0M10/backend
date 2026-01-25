@@ -2,7 +2,7 @@
 # NOVAGUARDIAN - Modelo de Alertas
 # ═══════════════════════════════════════════════════════════════════════════
 
-from sqlalchemy import Column, String, Boolean, DateTime, Float, Text, ForeignKey, Enum
+from sqlalchemy import Column, String, Boolean, DateTime, Float, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -117,8 +117,9 @@ class Alert(Base, UUIDMixin, TimestampMixin):
     # ═══════════════════════════════════════════════════════════════════════
     # INFORMACIÓN DE LA ALERTA
     # ═══════════════════════════════════════════════════════════════════════
-    alert_type = Column(Enum(AlertType), nullable=False, index=True)
-    severity = Column(Enum(AlertSeverity), nullable=False, index=True)
+    # Usamos String para coincidir con enums nativos de PostgreSQL
+    alert_type = Column(String(30), nullable=False, index=True)
+    severity = Column(String(20), nullable=False, index=True)
     
     title = Column(String(200), nullable=False)
     message = Column(Text, nullable=False)
@@ -156,7 +157,7 @@ class Alert(Base, UUIDMixin, TimestampMixin):
     device = relationship("Device", back_populates="alerts")
 
     def __repr__(self):
-        return f"<Alert {self.alert_type.value} - {self.severity.value}>"
+        return f"<Alert {self.alert_type} - {self.severity}>"
     
     @classmethod
     def create_from_type(

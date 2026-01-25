@@ -124,7 +124,7 @@ async def get_app_users(
                     "first_name": user.first_name,
                     "last_name": user.last_name,
                     "phone": user.phone,
-                    "role": user.role,
+                    "is_admin": user.is_admin,
                     "is_active": user.is_active,
                     "is_verified": user.is_verified,
                     "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -152,27 +152,35 @@ async def get_app_user(
     """
     Obtener un usuario específico por ID
     """
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    
-    if not user:
+    try:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuario no encontrado"
+            )
+        
+        return {
+            "id": str(user.id),
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "phone": user.phone,
+            "is_admin": user.is_admin,
+            "is_active": user.is_active,
+            "is_verified": user.is_verified,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_login": user.last_login.isoformat() if user.last_login else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuario no encontrado"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener usuario: {str(e)}"
         )
-    
-    return {
-        "id": str(user.id),
-        "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "phone": user.phone,
-        "role": user.role,
-        "is_active": user.is_active,
-        "is_verified": user.is_verified,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
-        "last_login": user.last_login.isoformat() if user.last_login else None
-    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════

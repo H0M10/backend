@@ -74,7 +74,7 @@ def create_access_token(
     
     encoded_jwt = jwt.encode(
         to_encode,
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM
     )
     return encoded_jwt
@@ -105,7 +105,7 @@ def create_refresh_token(
     
     encoded_jwt = jwt.encode(
         to_encode,
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM
     )
     return encoded_jwt
@@ -131,7 +131,7 @@ def decode_token(token: str) -> Optional[TokenPayload]:
     try:
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM]
         )
         return TokenPayload(**payload)
@@ -180,7 +180,7 @@ async def get_current_user(
     try:
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM]
         )
         user_id: str = payload.get("sub")
@@ -259,7 +259,7 @@ def create_password_reset_token(email: str) -> str:
     }
     return jwt.encode(
         to_encode,
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM
     )
 
@@ -274,7 +274,7 @@ def verify_password_reset_token(token: str) -> Optional[str]:
     try:
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM]
         )
         
@@ -297,7 +297,7 @@ def create_email_verification_token(email: str) -> str:
     }
     return jwt.encode(
         to_encode,
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM
     )
 
@@ -312,7 +312,7 @@ def verify_email_token(token: str) -> Optional[str]:
     try:
         payload = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM]
         )
         
@@ -335,6 +335,6 @@ def create_device_link_token(device_code: str) -> str:
     }
     return jwt.encode(
         to_encode,
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM
     )

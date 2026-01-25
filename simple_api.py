@@ -1493,6 +1493,60 @@ async def get_current_vital_signs(
         for row in rows
     ]
 
+@app.get("/api/v1/vital-signs/device/{device_id}/current", response_model=Optional[VitalSignsResponse])
+async def get_device_vital_signs_current(
+    device_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Obtener signos vitales actuales de un dispositivo específico"""
+    # Verificar que el dispositivo pertenece al usuario
+    device = await db.fetchrow("""
+        SELECT d.* FROM devices d
+        JOIN monitored_persons mp ON d.monitored_person_id = mp.id
+        WHERE d.id = $1 AND mp.user_id = $2
+    """, UUID(device_id), current_user['id'])
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+    
+    # Obtener último registro de signos vitales
+    row = await db.fetchrow("""
+        SELECT * FROM vital_signs
+        WHERE device_id = $1
+        ORDER BY recorded_at DESC
+        LIMIT 1
+    """, UUID(device_id))
+    
+    if not row:
+        # Generar signos vitales simulados si no hay datos
+        simulated = IoTSimulator.generate_vital_signs(device_id)
+        return VitalSignsResponse(
+            id=str(uuid4()),
+            deviceId=device_id,
+            heartRate=simulated['heart_rate'],
+            spo2=simulated['spo2'],
+            temperature=simulated['temperature'],
+            systolicBp=simulated['systolic_bp'],
+            diastolicBp=simulated['diastolic_bp'],
+            steps=simulated['steps'],
+            calories=simulated['calories'],
+            recordedAt=datetime.now(timezone.utc).isoformat()
+        )
+    
+    return VitalSignsResponse(
+        id=str(row['id']),
+        deviceId=str(row['device_id']),
+        heartRate=float(row['heart_rate']) if row.get('heart_rate') else None,
+        spo2=float(row['spo2']) if row.get('spo2') else None,
+        temperature=float(row['temperature']) if row.get('temperature') else None,
+        systolicBp=float(row['systolic_bp']) if row.get('systolic_bp') else None,
+        diastolicBp=float(row['diastolic_bp']) if row.get('diastolic_bp') else None,
+        steps=row.get('steps', 0),
+        calories=float(row.get('calories', 0)),
+        recordedAt=format_datetime(row['recorded_at'])
+    )
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - LOCATIONS
@@ -1544,6 +1598,45 @@ async def get_device_current_location(
     
     if not row:
         return None
+    
+    return LocationResponse(
+        id=str(row['id']),
+        deviceId=str(row['device_id']),
+        latitude=float(row['latitude']),
+        longitude=float(row['longitude']),
+        accuracy=float(row['accuracy']) if row.get('accuracy') else None,
+        address=row.get('address'),
+        recordedAt=format_datetime(row['recorded_at'])
+    )
+
+@app.get("/api/v1/locations/device/{device_id}/current", response_model=Optional[LocationResponse])
+async def get_location_device_current(
+    device_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Obtener ubicación actual de un dispositivo (ruta alternativa para móvil)"""
+    row = await db.fetchrow("""
+        SELECT l.* FROM locations l
+        JOIN devices d ON l.device_id = d.id
+        JOIN monitored_persons mp ON d.monitored_person_id = mp.id
+        WHERE l.device_id = $1 AND mp.user_id = $2
+        ORDER BY l.recorded_at DESC
+        LIMIT 1
+    """, UUID(device_id), current_user['id'])
+    
+    if not row:
+        # Generar ubicación simulada si no hay datos
+        simulated = IoTSimulator.generate_location(device_id)
+        return LocationResponse(
+            id=str(uuid4()),
+            deviceId=device_id,
+            latitude=simulated['latitude'],
+            longitude=simulated['longitude'],
+            accuracy=simulated['accuracy'],
+            address=simulated.get('address'),
+            recordedAt=datetime.now(timezone.utc).isoformat()
+        )
     
     return LocationResponse(
         id=str(row['id']),
@@ -2094,6 +2187,16 @@ async def get_pending_alerts_count(
     
     return {"success": True, "data": {"count": result or 0}}
 
+# IMPORTANTE: Este endpoint debe estar ANTES de /alerts/{alert_id} para evitar conflictos de rutas
+@app.get("/api/v1/alerts/unread")
+async def get_unread_alerts(
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Obtener alertas no leídas del usuario"""
+    alerts = await _get_alerts(current_user['id'], db, limit=50, unread_only=True)
+    return {"success": True, "data": alerts}
+
 @app.get("/api/v1/alerts/{alert_id}")
 async def get_alert_detail(
     alert_id: str,
@@ -2156,6 +2259,46 @@ async def mark_alert_attended(
         UPDATE alerts SET is_read = TRUE, updated_at = $1
         WHERE id = $2
     """, get_utc_now(), UUID(alert_id))
+    
+    return {"success": True, "data": None}
+
+@app.put("/api/v1/alerts/{alert_id}/attend")
+async def attend_alert(
+    alert_id: str,
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db),
+    body: dict = Body(default={})
+):
+    """Marcar alerta como atendida (endpoint alternativo para móvil)"""
+    notes = body.get('notes', '')
+    now = get_utc_now()
+    
+    await db.execute("""
+        UPDATE alerts 
+        SET is_read = TRUE, is_resolved = TRUE, resolved_at = $1, 
+            resolved_by = $2, notes = $3, updated_at = $1
+        WHERE id = $4
+    """, now, current_user['id'], notes, UUID(alert_id))
+    
+    # Obtener la alerta actualizada
+    alert = await db.fetchrow("SELECT * FROM alerts WHERE id = $1", UUID(alert_id))
+    
+    if alert:
+        return {
+            "success": True,
+            "data": {
+                "id": str(alert['id']),
+                "deviceId": str(alert['device_id']),
+                "type": alert['alert_type'],
+                "severity": alert['severity'],
+                "title": alert['title'],
+                "message": alert['message'],
+                "isRead": alert['is_read'],
+                "isResolved": alert['is_resolved'],
+                "notes": alert['notes'],
+                "createdAt": alert['created_at'].isoformat() if alert.get('created_at') else None
+            }
+        }
     
     return {"success": True, "data": None}
 

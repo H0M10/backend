@@ -199,7 +199,8 @@ class AuthService:
         return {
             "access_token": tokens["access_token"],
             "refresh_token": tokens["refresh_token"],
-            "token_type": "bearer"
+            "token_type": "bearer",
+            "expires_in": tokens["expires_in"]
         }
     
     async def forgot_password(self, email: str) -> str:

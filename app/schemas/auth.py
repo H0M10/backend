@@ -30,6 +30,7 @@ class RefreshTokenRequest(BaseModel):
 class RefreshTokenResponse(BaseModel):
     """Schema de respuesta de refresh token"""
     access_token: str
+    refresh_token: Optional[str] = None  # Nuevo refresh token (opcional)
     token_type: str = "bearer"
     expires_in: int
 

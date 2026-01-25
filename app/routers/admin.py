@@ -31,47 +31,187 @@ async def get_dashboard_stats(
     """
     Obtener estadísticas del dashboard de administración
     """
+    from datetime import date
+    from sqlalchemy import and_
+    
     try:
-        # Contar usuarios totales
-        users_result = await db.execute(select(func.count(User.id)))
+        # Contar usuarios totales (activos)
+        users_result = await db.execute(
+            select(func.count(User.id)).where(User.is_active == True)
+        )
         total_users = users_result.scalar() or 0
         
         # Contar dispositivos totales
         devices_result = await db.execute(select(func.count(Device.id)))
         total_devices = devices_result.scalar() or 0
         
-        # Contar dispositivos activos
+        # Contar dispositivos conectados (is_connected = True)
         active_devices_result = await db.execute(
-            select(func.count(Device.id)).where(Device.is_active == True)
+            select(func.count(Device.id)).where(Device.is_connected == True)
         )
         active_devices = active_devices_result.scalar() or 0
         
-        # Contar alertas totales
-        alerts_result = await db.execute(select(func.count(Alert.id)))
-        total_alerts = alerts_result.scalar() or 0
-        
-        # Contar alertas no leídas
-        unread_alerts_result = await db.execute(
-            select(func.count(Alert.id)).where(Alert.is_read == False)
+        # Contar alertas de hoy
+        today = date.today()
+        alerts_today_result = await db.execute(
+            select(func.count(Alert.id)).where(
+                func.date(Alert.created_at) == today
+            )
         )
-        unread_alerts = unread_alerts_result.scalar() or 0
+        total_alerts_today = alerts_today_result.scalar() or 0
         
-        # Contar personas monitoreadas
-        monitored_result = await db.execute(select(func.count(MonitoredPerson.id)))
+        # Contar alertas pendientes (no resueltas)
+        pending_alerts_result = await db.execute(
+            select(func.count(Alert.id)).where(Alert.is_resolved == False)
+        )
+        pending_alerts = pending_alerts_result.scalar() or 0
+        
+        # Contar personas monitoreadas activas
+        monitored_result = await db.execute(
+            select(func.count(MonitoredPerson.id)).where(MonitoredPerson.is_active == True)
+        )
         total_monitored = monitored_result.scalar() or 0
         
+        # Respuesta en camelCase para el frontend
         return {
-            "total_users": total_users,
-            "total_devices": total_devices,
-            "active_devices": active_devices,
-            "total_alerts": total_alerts,
-            "unread_alerts": unread_alerts,
-            "total_monitored": total_monitored
+            "totalUsers": total_users,
+            "totalDevices": total_devices,
+            "totalMonitored": total_monitored,
+            "totalAlertsToday": total_alerts_today,
+            "activeDevices": active_devices,
+            "pendingAlerts": pending_alerts
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al obtener estadísticas: {str(e)}"
+        )
+
+
+@router.get("/dashboard/users-by-month")
+async def get_users_by_month(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Usuarios registrados por mes (últimos 6 meses)
+    """
+    from sqlalchemy import text
+    
+    try:
+        result = await db.execute(text("""
+            SELECT 
+                TO_CHAR(created_at, 'Mon') as month,
+                EXTRACT(MONTH FROM created_at) as month_num,
+                COUNT(*) as count
+            FROM users 
+            WHERE created_at >= NOW() - INTERVAL '6 months'
+            GROUP BY TO_CHAR(created_at, 'Mon'), EXTRACT(MONTH FROM created_at)
+            ORDER BY month_num
+        """))
+        rows = result.fetchall()
+        return [{"month": r[0], "count": r[2]} for r in rows]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener usuarios por mes: {str(e)}"
+        )
+
+
+@router.get("/dashboard/alerts-by-type")
+async def get_alerts_by_type(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Alertas agrupadas por tipo (últimos 30 días)
+    """
+    from sqlalchemy import text
+    
+    try:
+        result = await db.execute(text("""
+            SELECT alert_type as type, COUNT(*) as count
+            FROM alerts
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY alert_type
+            ORDER BY count DESC
+        """))
+        rows = result.fetchall()
+        return [{"type": r[0], "count": r[1]} for r in rows]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener alertas por tipo: {str(e)}"
+        )
+
+
+@router.get("/dashboard/devices-by-status")
+async def get_devices_by_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Dispositivos agrupados por estado
+    """
+    from sqlalchemy import text
+    
+    try:
+        result = await db.execute(text("""
+            SELECT status, COUNT(*) as count
+            FROM devices
+            GROUP BY status
+        """))
+        rows = result.fetchall()
+        return [{"status": r[0], "count": r[1]} for r in rows]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener dispositivos por estado: {str(e)}"
+        )
+
+
+@router.get("/dashboard/recent-alerts")
+async def get_recent_alerts(
+    limit: int = Query(5, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Alertas recientes críticas
+    """
+    from sqlalchemy import text
+    
+    try:
+        result = await db.execute(text("""
+            SELECT a.id, a.alert_type, a.severity, a.message, a.is_resolved, a.created_at,
+                   d.name as device_name, d.serial_number,
+                   mp.first_name, mp.last_name
+            FROM alerts a
+            JOIN devices d ON a.device_id = d.id
+            LEFT JOIN monitored_persons mp ON d.monitored_person_id = mp.id
+            WHERE a.severity = 'critical'
+            ORDER BY a.created_at DESC
+            LIMIT :limit
+        """), {"limit": limit})
+        rows = result.fetchall()
+        
+        return [
+            {
+                "id": str(r[0]),
+                "type": r[1],
+                "severity": r[2],
+                "message": r[3],
+                "isResolved": r[4],
+                "createdAt": r[5].isoformat() if r[5] else None,
+                "deviceName": r[6],
+                "personName": f"{r[8]} {r[9]}" if r[8] else None
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener alertas recientes: {str(e)}"
         )
 
 

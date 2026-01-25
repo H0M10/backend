@@ -203,6 +203,94 @@ async def health_check():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Dashboard Summary (para compatibilidad con frontend)
+# ═══════════════════════════════════════════════════════════════════════════
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db
+from app.models.user import User
+from app.models.device import Device
+from app.models.alert import Alert
+from app.models.monitored_person import MonitoredPerson
+from fastapi import Depends
+
+
+@app.get(f"{settings.API_V1_PREFIX}/dashboard/summary", tags=["Dashboard"])
+async def get_dashboard_summary(db: AsyncSession = Depends(get_db)):
+    """
+    Resumen general del dashboard (endpoint público para la app móvil)
+    """
+    from datetime import date
+    
+    try:
+        # Total usuarios activos
+        users_result = await db.execute(
+            select(func.count(User.id)).where(User.is_active == True)
+        )
+        total_users = users_result.scalar() or 0
+        
+        # Total dispositivos
+        devices_result = await db.execute(select(func.count(Device.id)))
+        total_devices = devices_result.scalar() or 0
+        
+        # Dispositivos conectados
+        connected_result = await db.execute(
+            select(func.count(Device.id)).where(Device.is_connected == True)
+        )
+        connected_devices = connected_result.scalar() or 0
+        
+        # Total personas monitoreadas
+        monitored_result = await db.execute(
+            select(func.count(MonitoredPerson.id)).where(MonitoredPerson.is_active == True)
+        )
+        total_monitored = monitored_result.scalar() or 0
+        
+        # Alertas de hoy
+        today = date.today()
+        alerts_today_result = await db.execute(
+            select(func.count(Alert.id)).where(
+                func.date(Alert.created_at) == today
+            )
+        )
+        alerts_today = alerts_today_result.scalar() or 0
+        
+        # Alertas pendientes
+        pending_result = await db.execute(
+            select(func.count(Alert.id)).where(Alert.is_resolved == False)
+        )
+        pending_alerts = pending_result.scalar() or 0
+        
+        # Alertas críticas
+        critical_result = await db.execute(
+            select(func.count(Alert.id)).where(Alert.severity == 'critical')
+        )
+        critical_alerts = critical_result.scalar() or 0
+        
+        return {
+            "totalUsers": total_users,
+            "totalDevices": total_devices,
+            "connectedDevices": connected_devices,
+            "disconnectedDevices": total_devices - connected_devices,
+            "totalMonitored": total_monitored,
+            "alertsToday": alerts_today,
+            "pendingAlerts": pending_alerts,
+            "criticalAlerts": critical_alerts
+        }
+    except Exception as e:
+        logger.error(f"Error en dashboard summary: {e}")
+        return {
+            "totalUsers": 0,
+            "totalDevices": 0,
+            "connectedDevices": 0,
+            "disconnectedDevices": 0,
+            "totalMonitored": 0,
+            "alertsToday": 0,
+            "pendingAlerts": 0,
+            "criticalAlerts": 0
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Punto de entrada
 # ═══════════════════════════════════════════════════════════════════════════
 

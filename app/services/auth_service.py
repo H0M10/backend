@@ -118,7 +118,7 @@ class AuthService:
                 "last_name": user.last_name,
                 "phone": user.phone,
                 "photo_url": user.photo_url,
-                "is_email_verified": user.is_email_verified,
+                "is_email_verified": user.is_verified,
                 "created_at": user.created_at.isoformat()
             }
         )

@@ -15,6 +15,9 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DATABASE_ECHO,
     poolclass=NullPool,  # Mejor para aplicaciones async
+    connect_args={
+        "statement_cache_size": 0,  # Requerido para Supabase/PgBouncer
+    },
 )
 
 # ═══════════════════════════════════════════════════════════════════════════

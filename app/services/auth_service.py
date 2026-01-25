@@ -22,7 +22,8 @@ from app.utils.security import (
     create_password_reset_token,
     verify_password_reset_token,
     create_email_verification_token,
-    verify_email_token
+    verify_email_token,
+    verify_token
 )
 
 
@@ -154,6 +155,52 @@ class AuthService:
             )
         
         return create_token_pair(str(user.id))
+    
+    async def refresh_token(self, refresh_token_str: str) -> dict:
+        """
+        Refrescar token de acceso usando un refresh token
+        
+        Args:
+            refresh_token_str: El refresh token actual
+            
+        Returns:
+            Nuevos tokens de acceso y refresh
+        """
+        # Verificar y decodificar el refresh token
+        user_id = verify_token(refresh_token_str, token_type="refresh")
+        
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token inválido o expirado"
+            )
+        
+        # Verificar que el usuario existe y está activo
+        result = await self.db.execute(
+            select(User).where(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Usuario no encontrado"
+            )
+        
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario inactivo"
+            )
+        
+        # Generar nuevos tokens
+        tokens = create_token_pair(str(user.id))
+        
+        return {
+            "access_token": tokens["access_token"],
+            "refresh_token": tokens["refresh_token"],
+            "token_type": "bearer"
+        }
     
     async def forgot_password(self, email: str) -> str:
         """

@@ -118,8 +118,16 @@ class AuthService:
                 "last_name": user.last_name,
                 "phone": user.phone,
                 "photo_url": user.photo_url,
+                "is_active": user.is_active,
+                "is_verified": user.is_verified,
                 "is_email_verified": user.is_verified,
-                "created_at": user.created_at.isoformat()
+                "language": user.language,
+                "timezone": user.timezone,
+                "push_notifications_enabled": user.push_notifications_enabled,
+                "email_notifications_enabled": user.email_notifications_enabled,
+                "sms_notifications_enabled": user.sms_notifications_enabled,
+                "created_at": user.created_at.isoformat(),
+                "updated_at": user.updated_at.isoformat() if user.updated_at else user.created_at.isoformat()
             }
         )
     

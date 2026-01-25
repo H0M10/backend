@@ -104,13 +104,14 @@ app = FastAPI(
 # Middlewares
 # ═══════════════════════════════════════════════════════════════════════════
 
-# CORS
+# CORS - Configuración para permitir peticiones desde el frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 

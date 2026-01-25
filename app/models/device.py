@@ -7,13 +7,24 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, UUIDMixin
+import enum
 
 
-# Valores válidos para status (enum nativo en PostgreSQL)
-DEVICE_STATUS_VALUES = ["connected", "disconnected", "low_battery", "error", "charging"]
+# Enums de Python para usar en el código (los valores coinciden con PostgreSQL)
+class DeviceStatus(str, enum.Enum):
+    """Estados posibles del dispositivo - coinciden con enum de PostgreSQL"""
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
+    LOW_BATTERY = "low_battery"
+    ERROR = "error"
+    CHARGING = "charging"
 
-# Valores válidos para model (enum nativo en PostgreSQL)
-DEVICE_MODEL_VALUES = ["NovaBand V1", "NovaBand V2", "NovaBand Pro"]
+
+class DeviceModel(str, enum.Enum):
+    """Modelos de dispositivo - coinciden con enum de PostgreSQL"""
+    NOVA_BAND_V1 = "NovaBand V1"
+    NOVA_BAND_V2 = "NovaBand V2"
+    NOVA_BAND_PRO = "NovaBand Pro"
 
 
 class Device(Base, UUIDMixin, TimestampMixin):

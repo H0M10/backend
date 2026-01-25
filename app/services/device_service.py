@@ -70,7 +70,7 @@ class DeviceService:
     async def get_by_code(self, code: str) -> Optional[Device]:
         """Obtener dispositivo por código de vinculación"""
         result = await self.db.execute(
-            select(Device).where(Device.link_code == code)
+            select(Device).where(Device.code == code)
         )
         return result.scalar_one_or_none()
     
@@ -115,8 +115,8 @@ class DeviceService:
             serial_number=serial_number or self._generate_serial(),
             model=model or "NovaGuardian Bracelet V1",
             monitored_person_id=monitored_person_id,
-            link_code=link_code,
-            status=DeviceStatus.INACTIVE
+            code=link_code,
+            status=DeviceStatus.DISCONNECTED.value
         )
         
         self.db.add(device)
@@ -191,9 +191,9 @@ class DeviceService:
         
         # Vincular
         device.monitored_person_id = monitored_person_id
-        device.status = DeviceStatus.ACTIVE
+        device.status = DeviceStatus.CONNECTED.value
         device.linked_at = datetime.utcnow()
-        device.link_code = None  # Invalidar código
+        device.code = None  # Invalidar código
         
         await self.db.commit()
         await self.db.refresh(device)
@@ -205,8 +205,8 @@ class DeviceService:
         device = await self.get_by_id(device_id, user_id)
         
         device.monitored_person_id = None
-        device.status = DeviceStatus.INACTIVE
-        device.link_code = self._generate_link_code()  # Generar nuevo código
+        device.status = DeviceStatus.DISCONNECTED.value
+        device.code = self._generate_link_code()  # Generar nuevo código
         
         await self.db.commit()
         await self.db.refresh(device)

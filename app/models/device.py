@@ -82,12 +82,12 @@ class Device(Base, UUIDMixin, TimestampMixin):
     # CONFIGURACIÓN
     # ═══════════════════════════════════════════════════════════════════════
     # Intervalo de envío de datos (segundos)
-    sync_interval = Column(Float, default=30, nullable=False)
+    sync_interval_seconds = Column(Float, default=30, nullable=False)
     
     # Sensores habilitados
-    heart_rate_enabled = Column(Boolean, default=True, nullable=False)
-    spo2_enabled = Column(Boolean, default=True, nullable=False)
-    temperature_enabled = Column(Boolean, default=True, nullable=False)
+    heart_rate_sensor_enabled = Column(Boolean, default=True, nullable=False)
+    spo2_sensor_enabled = Column(Boolean, default=True, nullable=False)
+    temperature_sensor_enabled = Column(Boolean, default=True, nullable=False)
     gps_enabled = Column(Boolean, default=True, nullable=False)
     fall_detection_enabled = Column(Boolean, default=True, nullable=False)
     

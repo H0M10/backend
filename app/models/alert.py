@@ -3,7 +3,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 from sqlalchemy import Column, String, Boolean, DateTime, Float, Text, ForeignKey, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.models.base import TimestampMixin, UUIDMixin
@@ -114,13 +114,6 @@ class Alert(Base, UUIDMixin, TimestampMixin):
         index=True
     )
     
-    monitored_person_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("monitored_persons.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True
-    )
-    
     # ═══════════════════════════════════════════════════════════════════════
     # INFORMACIÓN DE LA ALERTA
     # ═══════════════════════════════════════════════════════════════════════
@@ -144,28 +137,23 @@ class Alert(Base, UUIDMixin, TimestampMixin):
     # ESTADO DE LA ALERTA
     # ═══════════════════════════════════════════════════════════════════════
     is_read = Column(Boolean, default=False, nullable=False)
-    is_attended = Column(Boolean, default=False, nullable=False)
-    attended_at = Column(DateTime(timezone=True), nullable=True)
-    attended_by = Column(UUID(as_uuid=True), nullable=True)  # User ID
+    is_dismissed = Column(Boolean, default=False, nullable=False)
+    is_resolved = Column(Boolean, default=False, nullable=False)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Si la alerta fue una falsa alarma
     is_false_alarm = Column(Boolean, default=False, nullable=False)
+    false_alarm_notes = Column(Text, nullable=True)
     
-    # Notas adicionales
+    # Datos adicionales JSON
+    data = Column(JSONB, nullable=True)
     notes = Column(Text, nullable=True)
-    
-    # ═══════════════════════════════════════════════════════════════════════
-    # NOTIFICACIONES ENVIADAS
-    # ═══════════════════════════════════════════════════════════════════════
-    push_sent = Column(Boolean, default=False, nullable=False)
-    email_sent = Column(Boolean, default=False, nullable=False)
-    sms_sent = Column(Boolean, default=False, nullable=False)
     
     # ═══════════════════════════════════════════════════════════════════════
     # RELACIONES
     # ═══════════════════════════════════════════════════════════════════════
     device = relationship("Device", back_populates="alerts")
-    monitored_person = relationship("MonitoredPerson", back_populates="alerts")
 
     def __repr__(self):
         return f"<Alert {self.alert_type.value} - {self.severity.value}>"

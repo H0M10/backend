@@ -334,8 +334,8 @@ async def get_pending_alerts(
                     "title": alert.title,
                     "message": alert.message,
                     "is_read": alert.is_read,
+                    "is_resolved": alert.is_resolved,
                     "device_id": str(alert.device_id) if alert.device_id else None,
-                    "monitored_person_id": str(alert.monitored_person_id) if alert.monitored_person_id else None,
                     "created_at": alert.created_at.isoformat() if alert.created_at else None
                 }
                 for alert in alerts
@@ -406,8 +406,8 @@ async def get_admin_alerts(
                     "title": alert.title,
                     "message": alert.message,
                     "is_read": alert.is_read,
+                    "is_resolved": alert.is_resolved,
                     "device_id": str(alert.device_id) if alert.device_id else None,
-                    "monitored_person_id": str(alert.monitored_person_id) if alert.monitored_person_id else None,
                     "created_at": alert.created_at.isoformat() if alert.created_at else None
                 }
                 for alert in alerts
@@ -450,8 +450,8 @@ async def get_admin_alert(
             "title": alert.title,
             "message": alert.message,
             "is_read": alert.is_read,
+            "is_resolved": alert.is_resolved,
             "device_id": str(alert.device_id) if alert.device_id else None,
-            "monitored_person_id": str(alert.monitored_person_id) if alert.monitored_person_id else None,
             "created_at": alert.created_at.isoformat() if alert.created_at else None
         }
     except HTTPException:

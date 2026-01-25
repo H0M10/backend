@@ -64,6 +64,9 @@ class MonitoredPerson(Base, UUIDMixin, TimestampMixin):
     # Notas generales
     notes = Column(Text, nullable=True)
     
+    # Relación con el cuidador (la columna en DB se llama "relationship")
+    relationship_type = Column("relationship", String(50), nullable=True)
+    
     # ═══════════════════════════════════════════════════════════════════════
     # UMBRALES PERSONALIZADOS DE SIGNOS VITALES
     # ═══════════════════════════════════════════════════════════════════════
@@ -107,12 +110,6 @@ class MonitoredPerson(Base, UUIDMixin, TimestampMixin):
     
     geofences = relationship(
         "Geofence",
-        back_populates="monitored_person",
-        cascade="all, delete-orphan"
-    )
-    
-    alerts = relationship(
-        "Alert",
         back_populates="monitored_person",
         cascade="all, delete-orphan"
     )

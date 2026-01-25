@@ -53,9 +53,17 @@ class Settings(BaseSettings):
     # CORS
     # ═══════════════════════════════════════════════════════════════════════
     CORS_ORIGINS: List[str] = [
+        # Producción - GitHub Pages
+        "https://www.novaguardian.online",
+        "https://novaguardian.online",
+        "https://h0m10.github.io",
+        # Desarrollo local
         "http://localhost:3000",
+        "http://localhost:5173",
         "http://localhost:8081",
-        "exp://localhost:8081"
+        "http://127.0.0.1:5173",
+        # Expo (desarrollo móvil)
+        "exp://localhost:8081",
     ]
     
     # ═══════════════════════════════════════════════════════════════════════

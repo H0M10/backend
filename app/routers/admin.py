@@ -4,7 +4,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from typing import List, Optional
 from uuid import UUID
 
@@ -30,42 +30,48 @@ async def get_dashboard_stats(
     """
     Obtener estadísticas del dashboard de administración
     """
-    # Contar usuarios totales
-    users_result = await db.execute(select(func.count(User.id)))
-    total_users = users_result.scalar() or 0
-    
-    # Contar dispositivos totales
-    devices_result = await db.execute(select(func.count(Device.id)))
-    total_devices = devices_result.scalar() or 0
-    
-    # Contar dispositivos activos
-    active_devices_result = await db.execute(
-        select(func.count(Device.id)).where(Device.is_active == True)
-    )
-    active_devices = active_devices_result.scalar() or 0
-    
-    # Contar alertas totales
-    alerts_result = await db.execute(select(func.count(Alert.id)))
-    total_alerts = alerts_result.scalar() or 0
-    
-    # Contar alertas no atendidas
-    unattended_alerts_result = await db.execute(
-        select(func.count(Alert.id)).where(Alert.is_attended == False)
-    )
-    unattended_alerts = unattended_alerts_result.scalar() or 0
-    
-    # Contar personas monitoreadas
-    monitored_result = await db.execute(select(func.count(MonitoredPerson.id)))
-    total_monitored = monitored_result.scalar() or 0
-    
-    return {
-        "total_users": total_users,
-        "total_devices": total_devices,
-        "active_devices": active_devices,
-        "total_alerts": total_alerts,
-        "unattended_alerts": unattended_alerts,
-        "total_monitored": total_monitored
-    }
+    try:
+        # Contar usuarios totales
+        users_result = await db.execute(select(func.count(User.id)))
+        total_users = users_result.scalar() or 0
+        
+        # Contar dispositivos totales
+        devices_result = await db.execute(select(func.count(Device.id)))
+        total_devices = devices_result.scalar() or 0
+        
+        # Contar dispositivos activos
+        active_devices_result = await db.execute(
+            select(func.count(Device.id)).where(Device.is_active == True)
+        )
+        active_devices = active_devices_result.scalar() or 0
+        
+        # Contar alertas totales
+        alerts_result = await db.execute(select(func.count(Alert.id)))
+        total_alerts = alerts_result.scalar() or 0
+        
+        # Contar alertas no leídas (en lugar de is_attended que puede no existir)
+        unread_alerts_result = await db.execute(
+            select(func.count(Alert.id)).where(Alert.is_read == False)
+        )
+        unread_alerts = unread_alerts_result.scalar() or 0
+        
+        # Contar personas monitoreadas
+        monitored_result = await db.execute(select(func.count(MonitoredPerson.id)))
+        total_monitored = monitored_result.scalar() or 0
+        
+        return {
+            "total_users": total_users,
+            "total_devices": total_devices,
+            "active_devices": active_devices,
+            "total_alerts": total_alerts,
+            "unread_alerts": unread_alerts,
+            "total_monitored": total_monitored
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener estadísticas: {str(e)}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -83,52 +89,58 @@ async def get_app_users(
     """
     Obtener lista de usuarios de la aplicación
     """
-    query = select(User)
-    
-    if search:
-        search_filter = f"%{search}%"
-        query = query.where(
-            (User.email.ilike(search_filter)) |
-            (User.first_name.ilike(search_filter)) |
-            (User.last_name.ilike(search_filter))
+    try:
+        query = select(User)
+        
+        if search:
+            search_filter = f"%{search}%"
+            query = query.where(
+                (User.email.ilike(search_filter)) |
+                (User.first_name.ilike(search_filter)) |
+                (User.last_name.ilike(search_filter))
+            )
+        
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        users = result.scalars().all()
+        
+        # Contar total
+        count_query = select(func.count(User.id))
+        if search:
+            search_filter = f"%{search}%"
+            count_query = count_query.where(
+                (User.email.ilike(search_filter)) |
+                (User.first_name.ilike(search_filter)) |
+                (User.last_name.ilike(search_filter))
+            )
+        count_result = await db.execute(count_query)
+        total = count_result.scalar() or 0
+        
+        return {
+            "items": [
+                {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "phone": user.phone,
+                    "role": user.role,
+                    "is_active": user.is_active,
+                    "is_verified": user.is_verified,
+                    "created_at": user.created_at.isoformat() if user.created_at else None,
+                    "last_login": user.last_login.isoformat() if user.last_login else None
+                }
+                for user in users
+            ],
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener usuarios: {str(e)}"
         )
-    
-    query = query.offset(skip).limit(limit)
-    result = await db.execute(query)
-    users = result.scalars().all()
-    
-    # Contar total
-    count_query = select(func.count(User.id))
-    if search:
-        search_filter = f"%{search}%"
-        count_query = count_query.where(
-            (User.email.ilike(search_filter)) |
-            (User.first_name.ilike(search_filter)) |
-            (User.last_name.ilike(search_filter))
-        )
-    count_result = await db.execute(count_query)
-    total = count_result.scalar() or 0
-    
-    return {
-        "items": [
-            {
-                "id": str(user.id),
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "phone": user.phone,
-                "role": user.role,
-                "is_active": user.is_active,
-                "is_verified": user.is_verified,
-                "created_at": user.created_at.isoformat() if user.created_at else None,
-                "last_login": user.last_login.isoformat() if user.last_login else None
-            }
-            for user in users
-        ],
-        "total": total,
-        "skip": skip,
-        "limit": limit
-    }
 
 
 @router.get("/app-users/{user_id}")
@@ -259,54 +271,58 @@ async def get_admin_alerts(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     severity: Optional[str] = None,
-    is_attended: Optional[bool] = None,
+    is_read: Optional[bool] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Obtener lista de todas las alertas
     """
-    query = select(Alert)
-    
-    if severity:
-        query = query.where(Alert.severity == severity)
-    if is_attended is not None:
-        query = query.where(Alert.is_attended == is_attended)
-    
-    query = query.order_by(Alert.created_at.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    alerts = result.scalars().all()
-    
-    # Contar total
-    count_query = select(func.count(Alert.id))
-    if severity:
-        count_query = count_query.where(Alert.severity == severity)
-    if is_attended is not None:
-        count_query = count_query.where(Alert.is_attended == is_attended)
-    count_result = await db.execute(count_query)
-    total = count_result.scalar() or 0
-    
-    return {
-        "items": [
-            {
-                "id": str(alert.id),
-                "alert_type": alert.alert_type,
-                "severity": alert.severity,
-                "title": alert.title,
-                "message": alert.message,
-                "is_read": alert.is_read,
-                "is_attended": alert.is_attended,
-                "device_id": str(alert.device_id) if alert.device_id else None,
-                "monitored_person_id": str(alert.monitored_person_id) if alert.monitored_person_id else None,
-                "created_at": alert.created_at.isoformat() if alert.created_at else None,
-                "attended_at": alert.attended_at.isoformat() if alert.attended_at else None
-            }
-            for alert in alerts
-        ],
-        "total": total,
-        "skip": skip,
-        "limit": limit
-    }
+    try:
+        query = select(Alert)
+        
+        if severity:
+            query = query.where(Alert.severity == severity)
+        if is_read is not None:
+            query = query.where(Alert.is_read == is_read)
+        
+        query = query.order_by(Alert.created_at.desc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        alerts = result.scalars().all()
+        
+        # Contar total
+        count_query = select(func.count(Alert.id))
+        if severity:
+            count_query = count_query.where(Alert.severity == severity)
+        if is_read is not None:
+            count_query = count_query.where(Alert.is_read == is_read)
+        count_result = await db.execute(count_query)
+        total = count_result.scalar() or 0
+        
+        return {
+            "items": [
+                {
+                    "id": str(alert.id),
+                    "alert_type": str(alert.alert_type.value) if alert.alert_type else None,
+                    "severity": str(alert.severity.value) if alert.severity else None,
+                    "title": alert.title,
+                    "message": alert.message,
+                    "is_read": alert.is_read,
+                    "device_id": str(alert.device_id) if alert.device_id else None,
+                    "monitored_person_id": str(alert.monitored_person_id) if alert.monitored_person_id else None,
+                    "created_at": alert.created_at.isoformat() if alert.created_at else None
+                }
+                for alert in alerts
+            ],
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener alertas: {str(e)}"
+        )
 
 
 @router.get("/alerts/{alert_id}")
@@ -318,28 +334,34 @@ async def get_admin_alert(
     """
     Obtener una alerta específica por ID
     """
-    result = await db.execute(select(Alert).where(Alert.id == alert_id))
-    alert = result.scalar_one_or_none()
-    
-    if not alert:
+    try:
+        result = await db.execute(select(Alert).where(Alert.id == alert_id))
+        alert = result.scalar_one_or_none()
+        
+        if not alert:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Alerta no encontrada"
+            )
+        
+        return {
+            "id": str(alert.id),
+            "alert_type": str(alert.alert_type.value) if alert.alert_type else None,
+            "severity": str(alert.severity.value) if alert.severity else None,
+            "title": alert.title,
+            "message": alert.message,
+            "is_read": alert.is_read,
+            "device_id": str(alert.device_id) if alert.device_id else None,
+            "monitored_person_id": str(alert.monitored_person_id) if alert.monitored_person_id else None,
+            "created_at": alert.created_at.isoformat() if alert.created_at else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Alerta no encontrada"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener alerta: {str(e)}"
         )
-    
-    return {
-        "id": str(alert.id),
-        "alert_type": alert.alert_type,
-        "severity": alert.severity,
-        "title": alert.title,
-        "message": alert.message,
-        "is_read": alert.is_read,
-        "is_attended": alert.is_attended,
-        "device_id": str(alert.device_id) if alert.device_id else None,
-        "monitored_person_id": str(alert.monitored_person_id) if alert.monitored_person_id else None,
-        "created_at": alert.created_at.isoformat() if alert.created_at else None,
-        "attended_at": alert.attended_at.isoformat() if alert.attended_at else None
-    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════

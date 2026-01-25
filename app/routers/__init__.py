@@ -3,7 +3,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 from fastapi import APIRouter
-from app.routers import auth, users, devices, monitored_persons, vital_signs, locations, alerts, notifications
+from app.routers import auth, users, devices, monitored_persons, vital_signs, locations, alerts, notifications, admin
 
 api_router = APIRouter()
 
@@ -16,3 +16,4 @@ api_router.include_router(vital_signs.router, prefix="/vital-signs", tags=["Sign
 api_router.include_router(locations.router, prefix="/locations", tags=["Ubicaciones"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["Alertas"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notificaciones"])
+api_router.include_router(admin.router, prefix="/admin", tags=["Administración"])

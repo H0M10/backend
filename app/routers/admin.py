@@ -199,11 +199,12 @@ async def get_admin_devices(
             {
                 "id": str(device.id),
                 "code": device.code,
-                "device_type": device.device_type,
+                "model": device.model.value if device.model else None,
                 "name": device.name,
                 "is_active": device.is_active,
                 "battery_level": device.battery_level,
                 "firmware_version": device.firmware_version,
+                "serial_number": device.serial_number,
                 "monitored_person_id": str(device.monitored_person_id) if device.monitored_person_id else None,
                 "last_sync": device.last_sync.isoformat() if device.last_sync else None,
                 "created_at": device.created_at.isoformat() if device.created_at else None
@@ -237,11 +238,12 @@ async def get_admin_device(
     return {
         "id": str(device.id),
         "code": device.code,
-        "device_type": device.device_type,
+        "model": device.model.value if device.model else None,
         "name": device.name,
         "is_active": device.is_active,
         "battery_level": device.battery_level,
         "firmware_version": device.firmware_version,
+        "serial_number": device.serial_number,
         "monitored_person_id": str(device.monitored_person_id) if device.monitored_person_id else None,
         "last_sync": device.last_sync.isoformat() if device.last_sync else None,
         "created_at": device.created_at.isoformat() if device.created_at else None

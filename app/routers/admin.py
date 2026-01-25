@@ -226,7 +226,7 @@ async def get_admin_devices(
                 "firmware_version": device.firmware_version,
                 "serial_number": device.serial_number,
                 "monitored_person_id": str(device.monitored_person_id) if device.monitored_person_id else None,
-                "last_sync": device.last_sync.isoformat() if device.last_sync else None,
+                "last_sync_at": device.last_sync_at.isoformat() if device.last_sync_at else None,
                 "created_at": device.created_at.isoformat() if device.created_at else None
             }
             for device in devices
@@ -265,7 +265,7 @@ async def get_admin_device(
         "firmware_version": device.firmware_version,
         "serial_number": device.serial_number,
         "monitored_person_id": str(device.monitored_person_id) if device.monitored_person_id else None,
-        "last_sync": device.last_sync.isoformat() if device.last_sync else None,
+        "last_sync_at": device.last_sync_at.isoformat() if device.last_sync_at else None,
         "created_at": device.created_at.isoformat() if device.created_at else None
     }
 

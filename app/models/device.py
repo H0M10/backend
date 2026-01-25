@@ -75,7 +75,7 @@ class Device(Base, UUIDMixin, TimestampMixin):
     # TIMESTAMPS DE ACTIVIDAD
     # ═══════════════════════════════════════════════════════════════════════
     last_seen = Column(DateTime(timezone=True), nullable=True)
-    last_sync = Column(DateTime(timezone=True), nullable=True)
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
     linked_at = Column(DateTime(timezone=True), nullable=True)
     
     # ═══════════════════════════════════════════════════════════════════════

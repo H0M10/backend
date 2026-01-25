@@ -745,8 +745,14 @@ async def lifespan(app: FastAPI):
     global pool
     print("[START] Iniciando NovaGuardian API...")
     db_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
-    pool = await asyncpg.create_pool(db_url, min_size=2, max_size=10)
-    print("[OK] Conectado a PostgreSQL (puerto 5433)")
+    # statement_cache_size=0 es REQUERIDO para Supabase/PgBouncer
+    pool = await asyncpg.create_pool(
+        db_url, 
+        min_size=2, 
+        max_size=10,
+        statement_cache_size=0  # Fix para PgBouncer transaction mode
+    )
+    print("[OK] Conectado a PostgreSQL (Supabase con PgBouncer)")
     print("[API] http://localhost:8002/api/v1")
     print("[DOCS] http://localhost:8002/docs")
     print("[LAN] http://192.168.100.45:8002/api/v1")

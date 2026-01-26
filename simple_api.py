@@ -2498,7 +2498,7 @@ async def admin_list_app_users(
         total = await db.fetchval("SELECT COUNT(*) FROM users")
     
     return {
-        "data": [
+        "items": [
             {
                 "id": str(r['id']),
                 "email": r['email'],
@@ -2516,12 +2516,10 @@ async def admin_list_app_users(
             }
             for r in rows
         ],
-        "pagination": {
-            "page": page,
-            "limit": limit,
-            "total": total,
-            "totalPages": (total + limit - 1) // limit
-        }
+        "total": total or 0,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit if total else 1
     }
 
 @app.post("/api/v1/admin/app-users")
@@ -2763,7 +2761,7 @@ async def admin_list_devices(
     total = await db.fetchval(count_query, *params[:-2]) if params[:-2] else await db.fetchval("SELECT COUNT(*) FROM devices")
     
     return {
-        "data": [
+        "items": [
             {
                 "id": str(r['id']),
                 "serialNumber": r['serial_number'],
@@ -2782,12 +2780,10 @@ async def admin_list_devices(
             }
             for r in rows
         ],
-        "pagination": {
-            "page": page,
-            "limit": limit,
-            "total": total or 0,
-            "totalPages": ((total or 0) + limit - 1) // limit
-        }
+        "total": total or 0,
+        "page": page,
+        "limit": limit,
+        "pages": ((total or 0) + limit - 1) // limit if total else 1
     }
 
 @app.get("/api/v1/admin/devices/{device_id}")
@@ -2993,7 +2989,7 @@ async def admin_list_alerts(
     total = await db.fetchval(count_query, *params[:-2]) if params[:-2] else await db.fetchval("SELECT COUNT(*) FROM alerts")
     
     return {
-        "data": [
+        "items": [
             {
                 "id": str(r['id']),
                 "type": r['alert_type'],
@@ -3009,12 +3005,10 @@ async def admin_list_alerts(
             }
             for r in rows
         ],
-        "pagination": {
-            "page": page,
-            "limit": limit,
-            "total": total or 0,
-            "totalPages": ((total or 0) + limit - 1) // limit
-        }
+        "total": total or 0,
+        "page": page,
+        "limit": limit,
+        "pages": ((total or 0) + limit - 1) // limit if total else 1
     }
 
 @app.get("/api/v1/admin/alerts/pending")
@@ -3151,7 +3145,7 @@ async def admin_list_monitored(
         total = await db.fetchval("SELECT COUNT(*) FROM monitored_persons")
     
     return {
-        "data": [
+        "items": [
             {
                 "id": str(r['id']),
                 "firstName": r['first_name'],
@@ -3169,12 +3163,10 @@ async def admin_list_monitored(
             }
             for r in rows
         ],
-        "pagination": {
-            "page": page,
-            "limit": limit,
-            "total": total or 0,
-            "totalPages": ((total or 0) + limit - 1) // limit
-        }
+        "total": total or 0,
+        "page": page,
+        "limit": limit,
+        "pages": ((total or 0) + limit - 1) // limit if total else 1
     }
 
 @app.get("/api/v1/admin/monitored/{person_id}")

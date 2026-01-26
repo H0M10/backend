@@ -3579,6 +3579,54 @@ async def debug_user_data(email: str, db = Depends(get_db)):
         } if testcode1 else None
     }
 
+@app.post("/api/v1/debug/link-device")
+async def debug_link_device(request: Request, db = Depends(get_db)):
+    """Endpoint de diagnóstico para vincular dispositivo manualmente (SOLO DEBUG)"""
+    data = await request.json()
+    device_code = data.get("device_code", "").upper()
+    person_id = data.get("person_id")
+    
+    if not device_code or not person_id:
+        return {"error": "device_code y person_id son requeridos"}
+    
+    try:
+        person_uuid = UUID(person_id)
+    except:
+        return {"error": "person_id inválido"}
+    
+    # Verificar que la persona existe
+    person = await db.fetchrow("SELECT id, first_name, last_name FROM monitored_persons WHERE id = $1", person_uuid)
+    if not person:
+        return {"error": "Persona no encontrada"}
+    
+    # Buscar dispositivo
+    device = await db.fetchrow(
+        "SELECT id, code, monitored_person_id FROM devices WHERE UPPER(REPLACE(code, '-', '')) = $1",
+        device_code.replace("-", "")
+    )
+    if not device:
+        return {"error": f"Dispositivo no encontrado con código: {device_code}"}
+    
+    # Vincular
+    await db.execute(
+        """UPDATE devices 
+           SET monitored_person_id = $1, 
+               is_connected = TRUE,
+               status = 'connected',
+               last_seen = $2,
+               linked_at = $2,
+               updated_at = $2 
+           WHERE id = $3""",
+        person_uuid, get_utc_now(), device['id']
+    )
+    
+    return {
+        "success": True,
+        "message": f"Dispositivo {device['code']} vinculado a {person['first_name']} {person['last_name']}",
+        "device_id": str(device['id']),
+        "person_id": str(person['id'])
+    }
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - AUTH ADICIONALES

@@ -3753,25 +3753,35 @@ async def link_device(
     # Si se proporciona monitored_person_id, vincular
     if monitored_person_id:
         # Verificar que la persona pertenece al usuario
+        try:
+            person_uuid = UUID(monitored_person_id) if isinstance(monitored_person_id, str) else monitored_person_id
+        except (ValueError, TypeError) as e:
+            raise HTTPException(status_code=400, detail=f"ID de persona monitoreada inválido: {monitored_person_id}")
+        
         person = await db.fetchrow(
             "SELECT id FROM monitored_persons WHERE id = $1 AND user_id = $2",
-            UUID(monitored_person_id), current_user['id']
+            person_uuid, current_user['id']
         )
         if not person:
             raise HTTPException(status_code=404, detail="Persona monitoreada no encontrada")
         
         # Vincular dispositivo y marcarlo como conectado para la demo
-        await db.execute(
-            """UPDATE devices 
-               SET monitored_person_id = $1, 
-                   is_connected = TRUE,
-                   status = 'connected',
-                   last_seen = $2,
-                   linked_at = $2,
-                   updated_at = $2 
-               WHERE id = $3""",
-            UUID(monitored_person_id), get_utc_now(), device['id']
-        )
+        try:
+            device_uuid = device['id'] if isinstance(device['id'], UUID) else UUID(str(device['id']))
+            await db.execute(
+                """UPDATE devices 
+                   SET monitored_person_id = $1, 
+                       is_connected = TRUE,
+                       status = 'connected',
+                       last_seen = $2,
+                       linked_at = $2,
+                       updated_at = $2 
+                   WHERE id = $3""",
+                person_uuid, get_utc_now(), device_uuid
+            )
+        except Exception as e:
+            print(f"[ERROR] link_device UPDATE failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Error al vincular dispositivo: {str(e)}")
     else:
         # Solo marcar como conectado aunque no tenga persona asignada
         await db.execute(

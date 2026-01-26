@@ -3710,6 +3710,27 @@ async def debug_user_alerts(email: str, db = Depends(get_db)):
     }
 
 
+@app.get("/api/v1/debug/alerts-full/{email}")
+async def debug_user_alerts_full(email: str, db = Depends(get_db)):
+    """Endpoint de diagnóstico que retorna alertas con la misma estructura que el endpoint real"""
+    # Buscar usuario
+    user = await db.fetchrow(
+        "SELECT id, email FROM users WHERE email = $1",
+        email.lower()
+    )
+    if not user:
+        return {"error": "Usuario no encontrado", "email": email}
+    
+    # Usar la misma función que el endpoint real
+    alerts = await _get_alerts(user['id'], db, limit=50)
+    
+    # Retornar con la misma estructura que el endpoint real
+    return {
+        "success": True,
+        "data": alerts
+    }
+
+
 @app.get("/api/v1/debug/vitals/{email}")
 async def debug_user_vitals(email: str, db = Depends(get_db)):
     """Endpoint de diagnóstico para ver signos vitales del usuario"""

@@ -3512,6 +3512,73 @@ async def health():
 async def api_health():
     return {"status": "healthy", "api": "v1", "timestamp": get_utc_now().isoformat()}
 
+@app.get("/api/v1/debug/user/{email}")
+async def debug_user_data(email: str, db = Depends(get_db)):
+    """Endpoint de diagnóstico temporal para ver datos de usuario"""
+    # Buscar usuario
+    user = await db.fetchrow(
+        "SELECT id, email, first_name, last_name, role FROM users WHERE email = $1",
+        email.lower()
+    )
+    if not user:
+        return {"error": "Usuario no encontrado", "email": email}
+    
+    # Buscar personas monitoreadas del usuario
+    persons = await db.fetch(
+        "SELECT id, user_id, first_name, last_name, is_active FROM monitored_persons WHERE user_id = $1",
+        user['id']
+    )
+    
+    # Buscar dispositivos vinculados a esas personas
+    devices = []
+    for person in persons:
+        device_rows = await db.fetch(
+            "SELECT id, code, serial_number, monitored_person_id, status, is_active FROM devices WHERE monitored_person_id = $1",
+            person['id']
+        )
+        for d in device_rows:
+            devices.append({
+                "id": str(d['id']),
+                "code": d['code'],
+                "serial_number": d['serial_number'],
+                "monitored_person_id": str(d['monitored_person_id']) if d['monitored_person_id'] else None,
+                "status": d['status'],
+                "is_active": d['is_active']
+            })
+    
+    # Buscar dispositivo por código específico
+    testcode1 = await db.fetchrow(
+        "SELECT id, code, serial_number, monitored_person_id, status, is_active FROM devices WHERE UPPER(code) = 'TESTCODE1'"
+    )
+    
+    return {
+        "user": {
+            "id": str(user['id']),
+            "email": user['email'],
+            "first_name": user['first_name'],
+            "last_name": user['last_name'],
+            "role": user['role']
+        },
+        "monitored_persons": [
+            {
+                "id": str(p['id']),
+                "user_id": str(p['user_id']),
+                "first_name": p['first_name'],
+                "last_name": p['last_name'],
+                "is_active": p['is_active']
+            } for p in persons
+        ],
+        "devices_linked_to_persons": devices,
+        "testcode1_device": {
+            "id": str(testcode1['id']) if testcode1 else None,
+            "code": testcode1['code'] if testcode1 else None,
+            "serial_number": testcode1['serial_number'] if testcode1 else None,
+            "monitored_person_id": str(testcode1['monitored_person_id']) if testcode1 and testcode1['monitored_person_id'] else None,
+            "status": testcode1['status'] if testcode1 else None,
+            "is_active": testcode1['is_active'] if testcode1 else None
+        } if testcode1 else None
+    }
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - AUTH ADICIONALES

@@ -2816,24 +2816,61 @@ async def admin_get_device(device_id: str, db = Depends(get_db)):
 @app.post("/api/v1/admin/devices")
 async def admin_create_device(request: Request, db = Depends(get_db)):
     """Crear/registrar un nuevo dispositivo"""
+    import re
     data = await request.json()
     
     device_id = uuid4()
     serial = data.get('serial_number', f"NV-{uuid4().hex[:8].upper()}")
     code = data.get('code', f"NG{uuid4().hex[:6].upper()}")
     
+    # Limpiar y normalizar el código
+    clean_code = code.replace("-", "").replace(" ", "").upper()
+    
+    # Validar formato del código (6-20 caracteres alfanuméricos)
+    if len(clean_code) < 6:
+        raise HTTPException(status_code=400, detail="El código debe tener al menos 6 caracteres")
+    if len(clean_code) > 20:
+        raise HTTPException(status_code=400, detail="El código no puede tener más de 20 caracteres")
+    if not re.match(r'^[A-Z0-9]+$', clean_code):
+        raise HTTPException(status_code=400, detail="El código solo puede contener letras y números")
+    
+    # Validar formato del serial (mínimo 5 caracteres)
+    if len(serial.strip()) < 5:
+        raise HTTPException(status_code=400, detail="El número de serie debe tener al menos 5 caracteres")
+    
+    # Verificar si el serial ya existe
+    existing_serial = await db.fetchval(
+        "SELECT id FROM devices WHERE serial_number = $1", serial
+    )
+    if existing_serial:
+        raise HTTPException(status_code=409, detail="El número de serie ya existe")
+    
+    # Verificar si el código ya existe (buscar con y sin guiones)
+    existing_code = await db.fetchval(
+        "SELECT id FROM devices WHERE REPLACE(code, '-', '') = $1 OR code = $2", 
+        clean_code, code.upper()
+    )
+    if existing_code:
+        raise HTTPException(status_code=409, detail="El código de dispositivo ya existe")
+    
+    # Insertar el nuevo dispositivo
     await db.execute("""
-        INSERT INTO devices (id, serial_number, code, name, model, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-    """, device_id, serial, code, data.get('name', 'NovaBand'), 
+        INSERT INTO devices (id, serial_number, code, name, model, is_active, status, battery_level, created_at)
+        VALUES ($1, $2, $3, $4, $5, TRUE, 'disconnected', 100, $6)
+    """, device_id, serial.strip(), clean_code, data.get('name', 'NovaBand'), 
         data.get('model', 'NovaBand V1'), get_utc_now())
     
     return {
         "id": str(device_id),
-        "serialNumber": serial,
-        "code": code,
+        "serialNumber": serial.strip(),
+        "code": clean_code,
         "name": data.get('name', 'NovaBand'),
-        "message": "Dispositivo creado exitosamente"
+        "model": data.get('model', 'NovaBand V1'),
+        "status": "disconnected",
+        "batteryLevel": 100,
+        "isActive": True,
+        "isConnected": False,
+        "message": "Dispositivo registrado exitosamente"
     }
 
 @app.get("/api/v1/admin/devices/generate-code")

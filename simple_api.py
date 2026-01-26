@@ -3726,8 +3726,8 @@ async def link_device(
     data = await request.json()
     # Acepta tanto 'code' como 'device_code'
     code = data.get("code") or data.get("device_code")
-    # Acepta tanto 'monitoredPersonId' como 'person_id'
-    monitored_person_id = data.get("monitoredPersonId") or data.get("person_id")
+    # Acepta camelCase y snake_case
+    monitored_person_id = data.get("monitoredPersonId") or data.get("monitored_person_id") or data.get("person_id")
     
     if not code:
         raise HTTPException(status_code=400, detail="Codigo de dispositivo requerido")
@@ -3919,18 +3919,27 @@ async def create_monitored_person(
     """Crear nueva persona monitoreada"""
     data = await request.json()
     
-    required_fields = ['firstName', 'lastName']
-    for field in required_fields:
-        if not data.get(field):
-            raise HTTPException(status_code=400, detail=f"{field} es requerido")
+    # Aceptar tanto camelCase como snake_case
+    first_name = data.get('firstName') or data.get('first_name')
+    last_name = data.get('lastName') or data.get('last_name')
+    relationship = data.get('relationship')
+    birth_date_str = data.get('birthDate') or data.get('birth_date')
+    gender = data.get('gender')
+    blood_type = data.get('bloodType') or data.get('blood_type')
+    weight_str = data.get('weight')
+    height_str = data.get('height')
+    photo_url = data.get('photoUrl') or data.get('photo_url')
+    notes = data.get('notes')
+    
+    if not first_name or not last_name:
+        raise HTTPException(status_code=400, detail="firstName y lastName son requeridos")
     
     person_id = uuid4()
     now = get_utc_now()
     
     # Convertir birthDate de string a date si viene como string
     birth_date = None
-    if data.get('birthDate'):
-        birth_date_str = data.get('birthDate')
+    if birth_date_str:
         if isinstance(birth_date_str, str):
             try:
                 # Formato esperado: YYYY-MM-DD
@@ -3942,16 +3951,16 @@ async def create_monitored_person(
     
     # Convertir weight y height a float si vienen como string
     weight = None
-    if data.get('weight'):
+    if weight_str:
         try:
-            weight = float(data.get('weight'))
+            weight = float(weight_str)
         except (ValueError, TypeError):
             weight = None
     
     height = None
-    if data.get('height'):
+    if height_str:
         try:
-            height = float(data.get('height'))
+            height = float(height_str)
         except (ValueError, TypeError):
             height = None
     
@@ -3961,10 +3970,10 @@ async def create_monitored_person(
             gender, blood_type, weight, height, photo_url, notes, is_active, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, TRUE, $13, $13)
     """, 
-        person_id, current_user['id'], data['firstName'], data['lastName'],
-        data.get('relationship'), birth_date, data.get('gender'),
-        data.get('bloodType'), weight, height,
-        data.get('photoUrl'), data.get('notes'), now
+        person_id, current_user['id'], first_name, last_name,
+        relationship, birth_date, gender,
+        blood_type, weight, height,
+        photo_url, notes, now
     )
     
     person = await _get_monitored_person(str(person_id), current_user['id'], db)

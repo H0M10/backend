@@ -3728,8 +3728,9 @@ async def link_device(
             """UPDATE devices 
                SET monitored_person_id = $1, 
                    is_connected = TRUE,
-                   status = 'online',
-                   last_connection = $2,
+                   status = 'connected',
+                   last_seen = $2,
+                   linked_at = $2,
                    updated_at = $2 
                WHERE id = $3""",
             UUID(monitored_person_id), get_utc_now(), device['id']
@@ -3739,8 +3740,8 @@ async def link_device(
         await db.execute(
             """UPDATE devices 
                SET is_connected = TRUE,
-                   status = 'online',
-                   last_connection = $1,
+                   status = 'connected',
+                   last_seen = $1,
                    updated_at = $1 
                WHERE id = $2""",
             get_utc_now(), device['id']

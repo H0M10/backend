@@ -3808,13 +3808,21 @@ async def link_device(
 ):
     """Vincular dispositivo con codigo"""
     data = await request.json()
+    print(f"[DEBUG] link_device recibido: {data}")
+    
     # Acepta tanto 'code' como 'device_code'
     code = data.get("code") or data.get("device_code")
     # Acepta camelCase y snake_case
     monitored_person_id = data.get("monitoredPersonId") or data.get("monitored_person_id") or data.get("person_id")
     
+    print(f"[DEBUG] link_device - code: {code}, monitored_person_id: {monitored_person_id}")
+    
     if not code:
         raise HTTPException(status_code=400, detail="Codigo de dispositivo requerido")
+    
+    # REQUERIDO: monitored_person_id es obligatorio para vincular
+    if not monitored_person_id:
+        raise HTTPException(status_code=400, detail="ID de persona monitoreada requerido para vincular dispositivo")
     
     # Limpiar el código (quitar guiones y espacios)
     clean_code = code.replace("-", "").replace(" ", "").upper()
@@ -3828,55 +3836,56 @@ async def link_device(
     )
     
     if not device:
+        print(f"[DEBUG] link_device - Dispositivo no encontrado con código: {clean_code}")
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado o codigo invalido")
+    
+    print(f"[DEBUG] link_device - Dispositivo encontrado: {device['id']}, monitored_person_id actual: {device['monitored_person_id']}")
     
     # Verificar que el dispositivo no este ya vinculado
     if device['monitored_person_id']:
         raise HTTPException(status_code=400, detail="Este dispositivo ya esta vinculado a otra persona")
     
-    # Si se proporciona monitored_person_id, vincular
-    if monitored_person_id:
-        # Verificar que la persona pertenece al usuario
-        try:
-            person_uuid = UUID(monitored_person_id) if isinstance(monitored_person_id, str) else monitored_person_id
-        except (ValueError, TypeError) as e:
-            raise HTTPException(status_code=400, detail=f"ID de persona monitoreada inválido: {monitored_person_id}")
-        
-        person = await db.fetchrow(
-            "SELECT id FROM monitored_persons WHERE id = $1 AND user_id = $2",
-            person_uuid, current_user['id']
-        )
-        if not person:
-            raise HTTPException(status_code=404, detail="Persona monitoreada no encontrada")
-        
-        # Vincular dispositivo y marcarlo como conectado para la demo
-        try:
-            device_uuid = device['id'] if isinstance(device['id'], UUID) else UUID(str(device['id']))
-            await db.execute(
-                """UPDATE devices 
-                   SET monitored_person_id = $1, 
-                       is_connected = TRUE,
-                       status = 'connected',
-                       last_seen = $2,
-                       linked_at = $2,
-                       updated_at = $2 
-                   WHERE id = $3""",
-                person_uuid, get_utc_now(), device_uuid
-            )
-        except Exception as e:
-            print(f"[ERROR] link_device UPDATE failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Error al vincular dispositivo: {str(e)}")
-    else:
-        # Solo marcar como conectado aunque no tenga persona asignada
+    # Vincular a la persona
+    try:
+        person_uuid = UUID(monitored_person_id) if isinstance(monitored_person_id, str) else monitored_person_id
+    except (ValueError, TypeError) as e:
+        print(f"[DEBUG] link_device - UUID inválido: {monitored_person_id}")
+        raise HTTPException(status_code=400, detail=f"ID de persona monitoreada inválido: {monitored_person_id}")
+    
+    person = await db.fetchrow(
+        "SELECT id FROM monitored_persons WHERE id = $1 AND user_id = $2",
+        person_uuid, current_user['id']
+    )
+    if not person:
+        print(f"[DEBUG] link_device - Persona no encontrada: {person_uuid} para usuario: {current_user['id']}")
+        raise HTTPException(status_code=404, detail="Persona monitoreada no encontrada")
+    
+    # Vincular dispositivo y marcarlo como conectado
+    try:
+        device_uuid = device['id'] if isinstance(device['id'], UUID) else UUID(str(device['id']))
         await db.execute(
             """UPDATE devices 
-               SET is_connected = TRUE,
+               SET monitored_person_id = $1, 
+                   is_connected = TRUE,
                    status = 'connected',
-                   last_seen = $1,
-                   updated_at = $1 
-               WHERE id = $2""",
-            get_utc_now(), device['id']
+                   last_seen = $2,
+                   linked_at = $2,
+                   updated_at = $2 
+               WHERE id = $3""",
+            person_uuid, get_utc_now(), device_uuid
         )
+        print(f"[DEBUG] link_device - Dispositivo {device_uuid} vinculado a persona {person_uuid}")
+    except Exception as e:
+        print(f"[ERROR] link_device UPDATE failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al vincular dispositivo: {str(e)}")
+    
+    # VERIFICACIÓN: Confirmar que el link se guardó correctamente
+    updated_device = await db.fetchrow("SELECT monitored_person_id FROM devices WHERE id = $1", device_uuid)
+    if not updated_device or updated_device['monitored_person_id'] != person_uuid:
+        print(f"[ERROR] link_device - Verificación falló! monitored_person_id: {updated_device['monitored_person_id'] if updated_device else 'null'}")
+        raise HTTPException(status_code=500, detail="Error: El dispositivo no se vinculó correctamente")
+    
+    print(f"[DEBUG] link_device - Verificación exitosa, dispositivo vinculado correctamente")
     
     # Obtener dispositivo actualizado con info de persona
     devices = await _get_user_devices(current_user['id'], db)
@@ -3890,10 +3899,11 @@ async def link_device(
             "code": device['code'],
             "name": device.get('name'),
             "model": device.get('model', 'NovaBand V1'),
-            "status": device['status'],
+            "status": "connected",
             "batteryLevel": float(device['battery_level']),
-            "isConnected": device['is_connected'],
-            "isActive": device['is_active']
+            "isConnected": True,
+            "isActive": device['is_active'],
+            "monitoredPersonId": str(person_uuid)
         }
     
     return {"success": True, "data": linked_device}

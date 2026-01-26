@@ -1002,8 +1002,25 @@ async def web_register(user_data: CreateStaffRequest, current_user: dict = Depen
     }
 
 @app.post("/api/v1/auth/refresh")
-async def refresh_token_endpoint(refresh_token: str, db = Depends(get_db)):
-    """Refrescar access token"""
+async def refresh_token_endpoint(request: Request, db = Depends(get_db)):
+    """Refrescar access token - acepta refresh_token del body JSON o query param"""
+    # Obtener refresh_token del body o query params
+    refresh_token = None
+    
+    # Primero intentar del body
+    try:
+        body = await request.json()
+        refresh_token = body.get("refresh_token") or body.get("refreshToken")
+    except:
+        pass
+    
+    # Si no está en el body, intentar de query params
+    if not refresh_token:
+        refresh_token = request.query_params.get("refresh_token")
+    
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="refresh_token es requerido")
+    
     try:
         payload = jwt.decode(refresh_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         user_id = payload.get("sub")

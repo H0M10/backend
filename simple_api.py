@@ -1537,15 +1537,15 @@ async def get_device_vital_signs_current(
     
     if not row:
         # Generar signos vitales simulados si no hay datos
-        simulated = IoTSimulator.generate_vital_signs(device_id)
+        simulated = IoTSimulator.generate_vitals(device_id)
         return VitalSignsResponse(
             id=str(uuid4()),
             deviceId=device_id,
-            heartRate=simulated['heart_rate'],
+            heartRate=simulated['heartRate'],
             spo2=simulated['spo2'],
             temperature=simulated['temperature'],
-            systolicBp=simulated['systolic_bp'],
-            diastolicBp=simulated['diastolic_bp'],
+            systolicBp=simulated['systolicBp'],
+            diastolicBp=simulated['diastolicBp'],
             steps=simulated['steps'],
             calories=simulated['calories'],
             recordedAt=datetime.now(timezone.utc).isoformat()

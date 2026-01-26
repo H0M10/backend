@@ -3696,6 +3696,56 @@ async def debug_user_alerts(email: str, db = Depends(get_db)):
     }
 
 
+@app.get("/api/v1/debug/vitals/{email}")
+async def debug_user_vitals(email: str, db = Depends(get_db)):
+    """Endpoint de diagnóstico para ver signos vitales del usuario"""
+    # Buscar usuario
+    user = await db.fetchrow(
+        "SELECT id, email FROM users WHERE email = $1",
+        email.lower()
+    )
+    if not user:
+        return {"error": "Usuario no encontrado", "email": email}
+    
+    # Buscar dispositivo del usuario
+    device = await db.fetchrow("""
+        SELECT d.id, d.code FROM devices d
+        JOIN monitored_persons mp ON d.monitored_person_id = mp.id
+        WHERE mp.user_id = $1
+    """, user['id'])
+    
+    if not device:
+        return {"error": "No tiene dispositivo vinculado"}
+    
+    device_id = str(device['id'])
+    
+    # Buscar últimos signos vitales en BD
+    row = await db.fetchrow("""
+        SELECT * FROM vital_signs
+        WHERE device_id = $1
+        ORDER BY recorded_at DESC
+        LIMIT 1
+    """, device['id'])
+    
+    # Generar signos vitales simulados
+    simulated = IoTSimulator.generate_vitals(device_id)
+    
+    return {
+        "user_id": str(user['id']),
+        "device_id": device_id,
+        "device_code": device['code'],
+        "has_real_data": row is not None,
+        "real_data": {
+            "id": str(row['id']) if row else None,
+            "heart_rate": float(row['heart_rate']) if row and row.get('heart_rate') else None,
+            "spo2": float(row['spo2']) if row and row.get('spo2') else None,
+            "temperature": float(row['temperature']) if row and row.get('temperature') else None,
+            "recorded_at": str(row['recorded_at']) if row else None
+        } if row else None,
+        "simulated_data": simulated
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - AUTH ADICIONALES
 # ═══════════════════════════════════════════════════════════════════════════

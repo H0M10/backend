@@ -3628,6 +3628,74 @@ async def debug_link_device(request: Request, db = Depends(get_db)):
     }
 
 
+@app.get("/api/v1/debug/alerts/{email}")
+async def debug_user_alerts(email: str, db = Depends(get_db)):
+    """Endpoint de diagnóstico para ver alertas del usuario"""
+    # Buscar usuario
+    user = await db.fetchrow(
+        "SELECT id, email FROM users WHERE email = $1",
+        email.lower()
+    )
+    if not user:
+        return {"error": "Usuario no encontrado", "email": email}
+    
+    # Buscar alertas usando la misma consulta que el endpoint real
+    alerts = await db.fetch("""
+        SELECT a.*, d.code as device_code FROM alerts a
+        JOIN devices d ON a.device_id = d.id
+        JOIN monitored_persons mp ON d.monitored_person_id = mp.id
+        WHERE mp.user_id = $1
+        ORDER BY a.created_at DESC LIMIT 50
+    """, user['id'])
+    
+    # También buscar el dispositivo para verificar
+    device = await db.fetchrow("""
+        SELECT d.id, d.code, d.monitored_person_id FROM devices d
+        JOIN monitored_persons mp ON d.monitored_person_id = mp.id
+        WHERE mp.user_id = $1
+    """, user['id'])
+    
+    # Contar alertas directamente por device_id si existe
+    direct_alerts = []
+    if device:
+        direct_alerts = await db.fetch("""
+            SELECT id, alert_type, severity, title, created_at FROM alerts
+            WHERE device_id = $1
+            ORDER BY created_at DESC LIMIT 50
+        """, device['id'])
+    
+    return {
+        "user_id": str(user['id']),
+        "user_email": user['email'],
+        "device": {
+            "id": str(device['id']) if device else None,
+            "code": device['code'] if device else None,
+            "monitored_person_id": str(device['monitored_person_id']) if device and device['monitored_person_id'] else None
+        } if device else None,
+        "alerts_via_join": [
+            {
+                "id": str(a['id']),
+                "device_code": a['device_code'],
+                "alert_type": a['alert_type'],
+                "severity": a['severity'],
+                "title": a['title'],
+                "created_at": str(a['created_at'])
+            } for a in alerts
+        ],
+        "alerts_direct_by_device": [
+            {
+                "id": str(a['id']),
+                "alert_type": a['alert_type'],
+                "severity": a['severity'],
+                "title": a['title'],
+                "created_at": str(a['created_at'])
+            } for a in direct_alerts
+        ],
+        "total_via_join": len(alerts),
+        "total_direct": len(direct_alerts)
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - AUTH ADICIONALES
 # ═══════════════════════════════════════════════════════════════════════════

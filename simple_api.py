@@ -1519,6 +1519,8 @@ async def get_device_vital_signs_current(
     db = Depends(get_db)
 ):
     """Obtener signos vitales actuales de un dispositivo específico"""
+    print(f"💓 GET /vital-signs/device/{device_id}/current - Usuario: {current_user.get('email', current_user['id'])}")
+    
     # Verificar que el dispositivo pertenece al usuario
     device = await db.fetchrow("""
         SELECT d.* FROM devices d
@@ -1527,6 +1529,7 @@ async def get_device_vital_signs_current(
     """, UUID(device_id), current_user['id'])
     
     if not device:
+        print(f"💔 Dispositivo {device_id} no encontrado para usuario {current_user['id']}")
         raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
     
     # Obtener último registro de signos vitales
@@ -1539,6 +1542,7 @@ async def get_device_vital_signs_current(
     
     if not row:
         # Generar signos vitales simulados si no hay datos
+        print(f"🔄 Generando vitales simulados para dispositivo {device_id}")
         simulated = IoTSimulator.generate_vitals(device_id)
         recorded_at = datetime.now(timezone.utc).isoformat()
         return VitalSignsResponse(
@@ -2110,6 +2114,7 @@ async def get_alerts(
         await _maybe_generate_alert(str(device['id']), db)
     
     alerts = await _get_alerts(current_user['id'], db, limit, unread_only)
+    print(f"📋 GET /alerts - Usuario: {current_user.get('email', current_user['id'])} - Alertas retornadas: {len(alerts)}")
     return {"success": True, "data": alerts}
 
 @app.get("/api/v1/alerts/stats")

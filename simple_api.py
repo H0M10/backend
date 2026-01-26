@@ -592,12 +592,14 @@ class VitalSignsResponse(BaseModel):
     deviceId: str
     heartRate: Optional[float] = None
     spo2: Optional[float] = None
+    oxygenLevel: Optional[float] = None  # Alias para spo2
     temperature: Optional[float] = None
     systolicBp: Optional[float] = None
     diastolicBp: Optional[float] = None
     steps: int = 0
     calories: float = 0
     recordedAt: str
+    timestamp: Optional[str] = None  # Alias para recordedAt
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -1538,30 +1540,37 @@ async def get_device_vital_signs_current(
     if not row:
         # Generar signos vitales simulados si no hay datos
         simulated = IoTSimulator.generate_vitals(device_id)
+        recorded_at = datetime.now(timezone.utc).isoformat()
         return VitalSignsResponse(
             id=str(uuid4()),
             deviceId=device_id,
             heartRate=simulated['heartRate'],
             spo2=simulated['spo2'],
+            oxygenLevel=simulated['spo2'],  # Alias para frontend
             temperature=simulated['temperature'],
             systolicBp=simulated['systolicBp'],
             diastolicBp=simulated['diastolicBp'],
             steps=simulated['steps'],
             calories=simulated['calories'],
-            recordedAt=datetime.now(timezone.utc).isoformat()
+            recordedAt=recorded_at,
+            timestamp=recorded_at  # Alias para frontend
         )
     
+    recorded_at_str = format_datetime(row['recorded_at'])
+    spo2_value = float(row['spo2']) if row.get('spo2') else None
     return VitalSignsResponse(
         id=str(row['id']),
         deviceId=str(row['device_id']),
         heartRate=float(row['heart_rate']) if row.get('heart_rate') else None,
-        spo2=float(row['spo2']) if row.get('spo2') else None,
+        spo2=spo2_value,
+        oxygenLevel=spo2_value,  # Alias para frontend
         temperature=float(row['temperature']) if row.get('temperature') else None,
         systolicBp=float(row['systolic_bp']) if row.get('systolic_bp') else None,
         diastolicBp=float(row['diastolic_bp']) if row.get('diastolic_bp') else None,
         steps=row.get('steps', 0),
         calories=float(row.get('calories', 0)),
-        recordedAt=format_datetime(row['recorded_at'])
+        recordedAt=recorded_at_str,
+        timestamp=recorded_at_str  # Alias para frontend
     )
 
 

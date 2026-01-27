@@ -97,7 +97,6 @@ class IoTSimulator:
         {"type": "GEOFENCE_EXIT", "severity": "warning", "title": "Salida de zona segura", "message": "La persona ha salido de la zona segura definida"},
         {"type": "GEOFENCE_ENTER", "severity": "info", "title": "Entrada a zona segura", "message": "La persona ha regresado a la zona segura"},
         {"type": "LOW_BATTERY", "severity": "info", "title": "Batería baja", "message": "El dispositivo tiene poca batería (<20%)"},
-        {"type": "DEVICE_DISCONNECTED", "severity": "warning", "title": "Dispositivo desconectado", "message": "Se perdió la conexión con el dispositivo"},
     ]
     
     # Control de última alerta generada (para evitar duplicados)
@@ -125,9 +124,9 @@ class IoTSimulator:
         if not last_critical or (now - last_critical).total_seconds() >= 1800:  # 30 min
             return (True, True)
         
-        # Verificar alerta normal (cada 1 minuto)
+        # Verificar alerta normal (cada 5 minutos - reducido para no saturar)
         last_alert = IoTSimulator._last_alert_time.get(device_key)
-        if not last_alert or (now - last_alert).total_seconds() >= 60:  # 1 min
+        if not last_alert or (now - last_alert).total_seconds() >= 300:  # 5 min
             return (True, False)
         
         return (False, False)

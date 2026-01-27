@@ -1512,7 +1512,7 @@ async def get_current_vital_signs(
         for row in rows
     ]
 
-@app.get("/api/v1/vital-signs/device/{device_id}/current", response_model=Optional[VitalSignsResponse])
+@app.get("/api/v1/vital-signs/device/{device_id}/current")
 async def get_device_vital_signs_current(
     device_id: str,
     current_user: dict = Depends(get_current_user),
@@ -1545,37 +1545,41 @@ async def get_device_vital_signs_current(
         print(f"🔄 Generando vitales simulados para dispositivo {device_id}")
         simulated = IoTSimulator.generate_vitals(device_id)
         recorded_at = datetime.now(timezone.utc).isoformat()
-        return VitalSignsResponse(
-            id=str(uuid4()),
-            deviceId=device_id,
-            heartRate=simulated['heartRate'],
-            spo2=simulated['spo2'],
-            oxygenLevel=simulated['spo2'],  # Alias para frontend
-            temperature=simulated['temperature'],
-            systolicBp=simulated['systolicBp'],
-            diastolicBp=simulated['diastolicBp'],
-            steps=simulated['steps'],
-            calories=simulated['calories'],
-            recordedAt=recorded_at,
-            timestamp=recorded_at  # Alias para frontend
-        )
+        vitals_data = {
+            "id": str(uuid4()),
+            "deviceId": device_id,
+            "heartRate": simulated['heartRate'],
+            "spo2": simulated['spo2'],
+            "oxygenLevel": simulated['spo2'],
+            "temperature": simulated['temperature'],
+            "systolicBp": simulated['systolicBp'],
+            "diastolicBp": simulated['diastolicBp'],
+            "steps": simulated['steps'],
+            "calories": simulated['calories'],
+            "recordedAt": recorded_at,
+            "timestamp": recorded_at
+        }
+        print(f"✅ Vitales generados: HR={simulated['heartRate']}, SpO2={simulated['spo2']}")
+        return {"success": True, "data": vitals_data}
     
     recorded_at_str = format_datetime(row['recorded_at'])
     spo2_value = float(row['spo2']) if row.get('spo2') else None
-    return VitalSignsResponse(
-        id=str(row['id']),
-        deviceId=str(row['device_id']),
-        heartRate=float(row['heart_rate']) if row.get('heart_rate') else None,
-        spo2=spo2_value,
-        oxygenLevel=spo2_value,  # Alias para frontend
-        temperature=float(row['temperature']) if row.get('temperature') else None,
-        systolicBp=float(row['systolic_bp']) if row.get('systolic_bp') else None,
-        diastolicBp=float(row['diastolic_bp']) if row.get('diastolic_bp') else None,
-        steps=row.get('steps', 0),
-        calories=float(row.get('calories', 0)),
-        recordedAt=recorded_at_str,
-        timestamp=recorded_at_str  # Alias para frontend
-    )
+    vitals_data = {
+        "id": str(row['id']),
+        "deviceId": str(row['device_id']),
+        "heartRate": float(row['heart_rate']) if row.get('heart_rate') else None,
+        "spo2": spo2_value,
+        "oxygenLevel": spo2_value,
+        "temperature": float(row['temperature']) if row.get('temperature') else None,
+        "systolicBp": float(row['systolic_bp']) if row.get('systolic_bp') else None,
+        "diastolicBp": float(row['diastolic_bp']) if row.get('diastolic_bp') else None,
+        "steps": row.get('steps', 0),
+        "calories": float(row.get('calories', 0)),
+        "recordedAt": recorded_at_str,
+        "timestamp": recorded_at_str
+    }
+    print(f"✅ Vitales de BD retornados")
+    return {"success": True, "data": vitals_data}
 
 
 # ═══════════════════════════════════════════════════════════════════════════

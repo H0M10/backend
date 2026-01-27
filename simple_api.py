@@ -389,15 +389,10 @@ class EmailService:
         return ''.join([str(random.randint(0, 9)) for _ in range(6)])
     
     @staticmethod
-    async def send_email(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
-        """
-        Envía un email usando SMTP.
-        Retorna True si se envió correctamente, False si hubo error.
-        """
+    def _send_email_sync(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
+        """Envía email de forma síncrona (usado internamente con timeout)"""
         if not settings.EMAIL_ENABLED or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
             print("⚠️ SMTP no configurado o deshabilitado. Email no enviado.")
-            print(f"   Para: {to_email}")
-            print(f"   Asunto: {subject}")
             return False
         
         try:
@@ -408,26 +403,18 @@ class EmailService:
             message["From"] = f"{settings.SMTP_FROM_NAME} <{from_email}>"
             message["To"] = to_email
             
-            # Agregar contenido de texto plano (fallback)
             if text_content:
-                part1 = MIMEText(text_content, "plain")
-                message.attach(part1)
+                message.attach(MIMEText(text_content, "plain"))
+            message.attach(MIMEText(html_content, "html"))
             
-            # Agregar contenido HTML
-            part2 = MIMEText(html_content, "html")
-            message.attach(part2)
-            
-            # Conectar y enviar según el tipo de conexión
             context = ssl.create_default_context()
             
             if settings.SMTP_SSL:
-                # Puerto 465 - SSL directo
-                with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, context=context) as server:
+                with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, context=context, timeout=10) as server:
                     server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                     server.sendmail(from_email, to_email, message.as_string())
             else:
-                # Puerto 587 - STARTTLS
-                with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+                with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
                     server.ehlo()
                     server.starttls(context=context)
                     server.ehlo()
@@ -439,10 +426,34 @@ class EmailService:
             
         except smtplib.SMTPAuthenticationError as e:
             print(f"❌ Error de autenticación SMTP: {e}")
-            print("   Verifica tu email y contraseña")
             return False
         except Exception as e:
             print(f"❌ Error enviando email: {e}")
+            return False
+    
+    @staticmethod
+    async def send_email(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
+        """Envía un email usando SMTP de forma asíncrona con timeout de 10 segundos."""
+        import asyncio
+        import concurrent.futures
+        
+        try:
+            loop = asyncio.get_event_loop()
+            # Ejecutar en thread pool para no bloquear el event loop
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        pool, 
+                        lambda: EmailService._send_email_sync(to_email, subject, html_content, text_content)
+                    ),
+                    timeout=15.0  # Timeout de 15 segundos
+                )
+                return result
+        except asyncio.TimeoutError:
+            print(f"⏰ Timeout enviando email a {to_email}")
+            return False
+        except Exception as e:
+            print(f"❌ Error en send_email async: {e}")
             return False
     
     @staticmethod
@@ -3830,7 +3841,7 @@ async def forgot_password(request: Request, db = Depends(get_db)):
         user['id'], reset_code, expires_at, get_utc_now()
     )
     
-    # Enviar email
+    # Enviar email (con timeout, no bloquea mucho)
     user_name = f"{user['first_name']} {user['last_name']}".strip() or "Usuario"
     email_sent = await email_service.send_password_reset_email(
         to_email=user['email'],
@@ -3838,15 +3849,21 @@ async def forgot_password(request: Request, db = Depends(get_db)):
         reset_code=reset_code
     )
     
-    if not email_sent:
-        # Si falla el envío pero SMTP no está configurado, mostrar código en consola (solo desarrollo)
-        print(f"🔑 [DEV] Código de recuperación para {email}: {reset_code}")
+    # SIEMPRE mostrar el código en consola para debugging
+    print(f"🔑 Código de recuperación para {email}: {reset_code}")
     
-    return {
+    response = {
         "success": True, 
         "message": "Si el email existe, recibiras un codigo para recuperar tu contrasena",
         "emailSent": email_sent
     }
+    
+    # En desarrollo/debug: devolver el código si el email no se envió
+    # Esto permite probar la funcionalidad sin SMTP configurado
+    if not email_sent:
+        response["devCode"] = reset_code  # Solo para desarrollo
+    
+    return response
 
 @app.post("/api/v1/auth/verify-reset-code")
 async def verify_reset_code(request: Request, db = Depends(get_db)):

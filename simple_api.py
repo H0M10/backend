@@ -1591,6 +1591,61 @@ async def get_device_vital_signs_current(
     print(f"✅ Vitales de BD retornados")
     return {"success": True, "data": vitals_data}
 
+@app.get("/api/v1/vital-signs/device/{device_id}/history")
+async def get_device_vital_signs_history(
+    device_id: str,
+    period: Optional[str] = "day",
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Obtener historial de signos vitales de un dispositivo específico"""
+    device = await db.fetchrow("""
+        SELECT d.* FROM devices d
+        JOIN monitored_persons mp ON d.monitored_person_id = mp.id
+        WHERE d.id = $1 AND mp.user_id = $2
+    """, UUID(device_id), current_user['id'])
+    
+    if not device:
+        raise HTTPException(status_code=404, detail="Dispositivo no encontrado")
+
+    hours = 24
+    if period == 'week':
+        hours = 24 * 7
+    elif period == 'month':
+        hours = 24 * 30
+        
+    rows = await db.fetch("""
+        SELECT * FROM vital_signs
+        WHERE device_id = $1 AND recorded_at >= $2
+        ORDER BY recorded_at DESC
+        LIMIT 100
+    """, UUID(device_id), get_utc_now() - timedelta(hours=hours))
+    
+    if not rows:
+        history = IoTSimulator.generate_vitals_history(device_id, hours)
+        return {"success": True, "data": history}
+        
+    data = []
+    for row in rows:
+        recorded_at_str = format_datetime(row['recorded_at'])
+        spo2_value = float(row['spo2']) if row.get('spo2') else None
+        data.append({
+            "id": str(row['id']),
+            "deviceId": str(row['device_id']),
+            "heartRate": float(row['heart_rate']) if row.get('heart_rate') else None,
+            "spo2": spo2_value,
+            "oxygenLevel": spo2_value,
+            "temperature": float(row['temperature']) if row.get('temperature') else None,
+            "systolicBp": float(row['systolic_bp']) if row.get('systolic_bp') else None,
+            "diastolicBp": float(row['diastolic_bp']) if row.get('diastolic_bp') else None,
+            "steps": row.get('steps', 0),
+            "calories": float(row.get('calories', 0)),
+            "recordedAt": recorded_at_str,
+            "timestamp": recorded_at_str
+        })
+    data.reverse()
+    return {"success": True, "data": data}
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ROUTES - LOCATIONS
@@ -3909,7 +3964,7 @@ async def verify_reset_code(request: Request, db = Depends(get_db)):
 
 @app.post("/api/v1/auth/reset-password")
 async def reset_password(request: Request, db = Depends(get_db)):
-    """Resetear contrasena con token"""
+    """Resetear contrasena con token o codigo directo"""
     data = await request.json()
     token = data.get("token") or data.get("resetToken")
     password = data.get("password") or data.get("newPassword")
@@ -3921,13 +3976,22 @@ async def reset_password(request: Request, db = Depends(get_db)):
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="La contrasena debe tener al menos 8 caracteres")
     
-    # Buscar token válido
+    # Buscar por temp_token primero (flujo de 2 pasos)
     reset_record = await db.fetchrow(
         """SELECT prt.*, u.email FROM password_reset_tokens prt
            JOIN users u ON u.id = prt.user_id
            WHERE prt.temp_token = $1 AND prt.temp_token_expires > $2 AND prt.used = FALSE""",
         token, get_utc_now()
     )
+    
+    # Si no se encontró, buscar por el código directo de 6 dígitos (flujo simplificado móvil)
+    if not reset_record:
+        reset_record = await db.fetchrow(
+            """SELECT prt.*, u.email FROM password_reset_tokens prt
+               JOIN users u ON u.id = prt.user_id
+               WHERE prt.token = $1 AND prt.expires_at > $2 AND prt.used = FALSE""",
+            token.strip(), get_utc_now()
+        )
     
     if not reset_record:
         raise HTTPException(status_code=400, detail="Token invalido o expirado")

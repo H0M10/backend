@@ -5158,6 +5158,86 @@ async def remove_caregiver(
 # RUN
 # ═══════════════════════════════════════════════════════════════════════════
 
+# =========================================================================
+# ADMINISTRADORES (Panel Admin)
+# =========================================================================
+
+@app.get("/api/v1/admin/administrators")
+async def admin_list_administrators(page: int = 1, limit: int = 100, db = Depends(get_db)):
+    offset = (page - 1) * limit
+    users = await db.fetch(
+        "SELECT id, email, first_name, last_name, phone, role, is_active, created_at FROM users WHERE is_admin = TRUE ORDER BY created_at DESC LIMIT $1 OFFSET $2", 
+        limit, offset
+    )
+    total = await db.fetchval("SELECT count(*) FROM users WHERE is_admin = TRUE")
+    return {
+        "items": [dict(u) for u in users], 
+        "total": total, 
+        "page": page, 
+        "limit": limit, 
+        "pages": (total + limit - 1) // limit if limit > 0 else 1
+    }
+
+@app.post("/api/v1/admin/administrators")
+async def admin_create_administrator(request: Request, db = Depends(get_db)):
+    data = await request.json()
+    email = data.get('email', '').lower().strip()
+    exists = await db.fetchval("SELECT id FROM users WHERE email = $1", email)
+    if exists: 
+        raise HTTPException(status_code=400, detail="Email ya registrado")
+    
+    pw = data.get('password')
+    hashed = bcrypt.hashpw(pw.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    full_name = data.get('full_name', '').strip()
+    first_name = full_name.split(' ')[0] if full_name else 'Admin'
+    last_name = ' '.join(full_name.split(' ')[1:]) if ' ' in full_name else ''
+    
+    user_id = str(uuid.uuid4())
+    await db.execute(
+        "INSERT INTO users (id, email, password_hash, first_name, last_name, phone, role, is_admin, is_active, is_verified, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, TRUE, TRUE, $8)", 
+        user_id, email, hashed, first_name, last_name, data.get('phone'), data.get('role', 'operator'), get_utc_now()
+    )
+    new_user = await db.fetchrow(
+        "SELECT id, email, first_name, last_name, phone, role, is_active, created_at FROM users WHERE id = $1", 
+        user_id
+    )
+    return dict(new_user)
+
+@app.put("/api/v1/admin/administrators/{admin_id}")
+async def admin_update_administrator(admin_id: str, request: Request, db = Depends(get_db)):
+    data = await request.json()
+    if 'full_name' in data:
+        full_name = data['full_name'].strip()
+        first_name = full_name.split(' ')[0] if full_name else 'Admin'
+        last_name = ' '.join(full_name.split(' ')[1:]) if ' ' in full_name else ''
+        await db.execute("UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3", first_name, last_name, admin_id)
+    if 'role' in data:
+        await db.execute("UPDATE users SET role=$1 WHERE id=$2", data['role'], admin_id)
+    if 'is_active' in data:
+        await db.execute("UPDATE users SET is_active=$1 WHERE id=$2", data['is_active'], admin_id)
+    if 'phone' in data:
+        await db.execute("UPDATE users SET phone=$1 WHERE id=$2", data['phone'], admin_id)
+        
+    user = await db.fetchrow(
+        "SELECT id, email, first_name, last_name, phone, role, is_active, created_at FROM users WHERE id = $1", 
+        admin_id
+    )
+    return dict(user)
+
+@app.delete("/api/v1/admin/administrators/{admin_id}")
+async def admin_delete_administrator(admin_id: str, db = Depends(get_db)):
+    await db.execute("UPDATE users SET is_active = FALSE WHERE id = $1", admin_id)
+    return {"success": True}
+
+@app.post("/api/v1/admin/administrators/{admin_id}/reset-password")
+async def admin_reset_password_administrator(admin_id: str, db = Depends(get_db)):
+    import random, string
+    new_password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    await db.execute("UPDATE users SET password_hash=$1 WHERE id=$2", hashed, admin_id)
+    return {"temporary_password": new_password}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002)

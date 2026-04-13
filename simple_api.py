@@ -5181,6 +5181,12 @@ async def admin_list_administrators(page: int = 1, limit: int = 100, db = Depend
 @app.post("/api/v1/admin/administrators")
 async def admin_create_administrator(request: Request, db = Depends(get_db)):
     data = await request.json()
+    
+    # Prevenir creación de super_admin
+    role = data.get('role', 'operator')
+    if role == 'super_admin':
+        raise HTTPException(status_code=400, detail="No se permite crear administradores con rol super_admin")
+
     email = data.get('email', '').lower().strip()
     exists = await db.fetchval("SELECT id FROM users WHERE email = $1", email)
     if exists: 
@@ -5192,10 +5198,10 @@ async def admin_create_administrator(request: Request, db = Depends(get_db)):
     first_name = full_name.split(' ')[0] if full_name else 'Admin'
     last_name = ' '.join(full_name.split(' ')[1:]) if ' ' in full_name else ''
     
-    user_id = str(uuid.uuid4())
+    user_id = str(uuid4())
     await db.execute(
         "INSERT INTO users (id, email, password_hash, first_name, last_name, phone, role, is_admin, is_active, is_verified, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, TRUE, TRUE, $8)", 
-        user_id, email, hashed, first_name, last_name, data.get('phone'), data.get('role', 'operator'), get_utc_now()
+        user_id, email, hashed, first_name, last_name, data.get('phone'), role, get_utc_now()
     )
     new_user = await db.fetchrow(
         "SELECT id, email, first_name, last_name, phone, role, is_active, created_at FROM users WHERE id = $1", 
@@ -5212,6 +5218,8 @@ async def admin_update_administrator(admin_id: str, request: Request, db = Depen
         last_name = ' '.join(full_name.split(' ')[1:]) if ' ' in full_name else ''
         await db.execute("UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3", first_name, last_name, admin_id)
     if 'role' in data:
+        if data['role'] == 'super_admin':
+            raise HTTPException(status_code=400, detail="No se permite asignar el rol super_admin")
         await db.execute("UPDATE users SET role=$1 WHERE id=$2", data['role'], admin_id)
     if 'is_active' in data:
         await db.execute("UPDATE users SET is_active=$1 WHERE id=$2", data['is_active'], admin_id)

@@ -5182,9 +5182,12 @@ async def admin_list_administrators(page: int = 1, limit: int = 100, db = Depend
 async def admin_create_administrator(request: Request, db = Depends(get_db)):
     data = await request.json()
     
-    # Prevenir creación de super_admin
-    role = data.get('role', 'operator')
-    if role == 'super_admin':
+    # Prevenir creación de super_admin y mapear a enum correcto
+    raw_role = data.get('role', 'operator').lower()
+    role_map = {"operador": "operator", "administrador": "admin", "admin": "admin", "operator": "operator"}
+    role = role_map.get(raw_role, "operator")
+    
+    if role == 'super_admin' or raw_role == 'super_admin':
         raise HTTPException(status_code=400, detail="No se permite crear administradores con rol super_admin")
 
     email = data.get('email', '').lower().strip()
@@ -5218,9 +5221,12 @@ async def admin_update_administrator(admin_id: str, request: Request, db = Depen
         last_name = ' '.join(full_name.split(' ')[1:]) if ' ' in full_name else ''
         await db.execute("UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3", first_name, last_name, admin_id)
     if 'role' in data:
-        if data['role'] == 'super_admin':
+        raw_role = data['role'].lower()
+        role_map = {"operador": "operator", "administrador": "admin", "admin": "admin", "operator": "operator"}
+        role = role_map.get(raw_role, "operator")
+        if role == 'super_admin' or raw_role == 'super_admin':
             raise HTTPException(status_code=400, detail="No se permite asignar el rol super_admin")
-        await db.execute("UPDATE users SET role=$1 WHERE id=$2", data['role'], admin_id)
+        await db.execute("UPDATE users SET role=$1 WHERE id=$2", role, admin_id)
     if 'is_active' in data:
         await db.execute("UPDATE users SET is_active=$1 WHERE id=$2", data['is_active'], admin_id)
     if 'phone' in data:

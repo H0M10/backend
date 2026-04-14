@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     SMTP_SSL: bool = True  # Puerto 465 usa SSL directo
     SMTP_TLS: bool = False
     
+    # Soporte para Resend API (HTTP Bypass para Railway)
+    RESEND_API_KEY: Optional[str] = None
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -391,6 +394,36 @@ class EmailService:
     @staticmethod
     def _send_email_sync(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
         """Envía email de forma síncrona (usado internamente con timeout)"""
+        
+        # 1. Intentar enviar vía Resend API (HTTP) para evadir bloqueos de Railway SMTP
+        if getattr(settings, 'RESEND_API_KEY', None):
+            try:
+                import httpx
+                response = httpx.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "from": f"{settings.SMTP_FROM_NAME} <onboarding@resend.dev>",
+                        "to": to_email,
+                        "subject": subject,
+                        "html": html_content
+                    },
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    print(f"✅ Email enviado vía Resend a: {to_email}")
+                    return True
+                else:
+                    print(f"❌ Error en Resend API: {response.text}")
+                    return False
+            except Exception as e:
+                print(f"❌ Excepción con Resend: {e}")
+                return False
+
+        # 2. Intentar vía SMTP Tradicional (Fallback)
         if not settings.EMAIL_ENABLED or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
             print("⚠️ SMTP no configurado o deshabilitado. Email no enviado.")
             return False
